@@ -14,24 +14,25 @@
 # limitations under the License.
 import torch
 import torch.nn.functional as F
-from matcha.models.components.flow_matching import BASECFM
+from matcha.models.components.flow_matching import BASECFM # NOTE 所以说，最初的basic conditional flow matching class是来自另外一个package啊！厉害了.
 from cosyvoice.utils.common import set_all_random_seed
 
 
 class ConditionalCFM(BASECFM):
     def __init__(self, in_channels, cfm_params, n_spks=1, spk_emb_dim=64, estimator: torch.nn.Module = None):
+        import ipdb; ipdb.set_trace()
         super().__init__(
-            n_feats=in_channels,
-            cfm_params=cfm_params,
-            n_spks=n_spks,
-            spk_emb_dim=spk_emb_dim,
+            n_feats=in_channels, # 240
+            cfm_params=cfm_params, # {'sigma_min': 1e-06, 'solver': 'euler', 't_scheduler': 'cosine', 'training_cfg_rate': 0.2, 'inference_cfg_rate': 0.7, 'reg_loss_type': 'l1'}
+            n_spks=n_spks, # 1
+            spk_emb_dim=spk_emb_dim, # 80
         )
-        self.t_scheduler = cfm_params.t_scheduler
-        self.training_cfg_rate = cfm_params.training_cfg_rate
-        self.inference_cfg_rate = cfm_params.inference_cfg_rate
-        in_channels = in_channels + (spk_emb_dim if n_spks > 0 else 0)
+        self.t_scheduler = cfm_params.t_scheduler # 'cosine'
+        self.training_cfg_rate = cfm_params.training_cfg_rate # 0.2
+        self.inference_cfg_rate = cfm_params.inference_cfg_rate # 0.7
+        in_channels = in_channels + (spk_emb_dim if n_spks > 0 else 0) # 240 + 80, spk=speaker
         # Just change the architecture of the estimator here
-        self.estimator = estimator
+        self.estimator = estimator # <class 'cosyvoice.flow.decoder.CausalConditionalDecoder'>
 
     @torch.inference_mode()
     def forward(self, mu, mask, n_timesteps, temperature=1.0, spks=None, cond=None, prompt_len=0, cache=torch.zeros(1, 80, 0, 2)):
@@ -52,7 +53,7 @@ class ConditionalCFM(BASECFM):
             sample: generated mel-spectrogram
                 shape: (batch_size, n_feats, mel_timesteps)
         """
-
+        import ipdb; ipdb.set_trace()
         z = torch.randn_like(mu).to(mu.device).to(mu.dtype) * temperature
         cache_size = cache.shape[2]
         # fix prompt and overlap part mu and z
@@ -83,6 +84,7 @@ class ConditionalCFM(BASECFM):
                 shape: (batch_size, spk_emb_dim)
             cond: Not used but kept for future purposes
         """
+        import ipdb; ipdb.set_trace()
         t, _, dt = t_span[0], t_span[-1], t_span[1] - t_span[0]
         t = t.unsqueeze(dim=0)
 
@@ -99,21 +101,21 @@ class ConditionalCFM(BASECFM):
         cond_in = torch.zeros([2, 80, x.size(2)], device=x.device, dtype=x.dtype)
         for step in range(1, len(t_span)):
             # Classifier-Free Guidance inference introduced in VoiceBox
-            x_in[:] = x
-            mask_in[:] = mask
-            mu_in[0] = mu
-            t_in[:] = t.unsqueeze(0)
-            spks_in[0] = spks
-            cond_in[0] = cond
+            x_in[:] = x # [1, 80, 796] -> [2, 80, 796]
+            mask_in[:] = mask # [1, 1, 796] -> [2, 1, 796]
+            mu_in[0] = mu # [1, 80, 796] -> [2, 80, 796]
+            t_in[:] = t.unsqueeze(0) # shape=[2], value=[0, 0]
+            spks_in[0] = spks # [1, 80]
+            cond_in[0] = cond # [1, 80, 796]
             dphi_dt = self.forward_estimator(
                 x_in, mask_in,
                 mu_in, t_in,
                 spks_in,
                 cond_in,
                 streaming
-            )
+            ) # dphi/dt
             dphi_dt, cfg_dphi_dt = torch.split(dphi_dt, [x.size(0), x.size(0)], dim=0)
-            dphi_dt = ((1.0 + self.inference_cfg_rate) * dphi_dt - self.inference_cfg_rate * cfg_dphi_dt)
+            dphi_dt = ((1.0 + self.inference_cfg_rate) * dphi_dt - self.inference_cfg_rate * cfg_dphi_dt) # Equation (14) in cosyvoice-1 paper: 2407.05407v2; beta=self.inference_cfg_rate NOTE
             x = x + dt * dphi_dt
             t = t + dt
             sol.append(x)
@@ -124,7 +126,7 @@ class ConditionalCFM(BASECFM):
 
     def forward_estimator(self, x, mask, mu, t, spks, cond, streaming=False):
         if isinstance(self.estimator, torch.nn.Module):
-            return self.estimator(x, mask, mu, t, spks, cond, streaming=streaming)
+            return self.estimator(x, mask, mu, t, spks, cond, streaming=streaming) # NOTE here, type of self.estimator = <class 'cosyvoice.flow.decoder.CausalConditionalDecoder'>
         else:
             [estimator, stream], trt_engine = self.estimator.acquire_estimator()
             # NOTE need to synchronize when switching stream
@@ -169,6 +171,7 @@ class ConditionalCFM(BASECFM):
             y: conditional flow
                 shape: (batch_size, n_feats, mel_timesteps)
         """
+        import ipdb; ipdb.set_trace()
         b, _, t = mu.shape
 
         # random timestep
@@ -195,9 +198,15 @@ class ConditionalCFM(BASECFM):
 
 class CausalConditionalCFM(ConditionalCFM):
     def __init__(self, in_channels, cfm_params, n_spks=1, spk_emb_dim=64, estimator: torch.nn.Module = None):
+        import ipdb; ipdb.set_trace()
         super().__init__(in_channels, cfm_params, n_spks, spk_emb_dim, estimator)
+        # in_channels: 240
+        # cfm_params: {'sigma_min': 1e-06, 'solver': 'euler', 't_scheduler': 'cosine', 'training_cfg_rate': 0.2, 'inference_cfg_rate': 0.7, 'reg_loss_type': 'l1'}
+        # 1
+        # 80
+        # <class 'cosyvoice.flow.decoder.CausalConditionalDecoder'>
         set_all_random_seed(0)
-        self.rand_noise = torch.randn([1, 80, 50 * 300])
+        self.rand_noise = torch.randn([1, 80, 50 * 300]) # NOTE what is 50, 300 for? 类似于最长噪声长度，也是能够处理的speech token sequence的最长长度
 
     @torch.inference_mode()
     def forward(self, mu, mask, n_timesteps, temperature=1.0, spks=None, cond=None, streaming=False):
@@ -205,23 +214,24 @@ class CausalConditionalCFM(ConditionalCFM):
 
         Args:
             mu (torch.Tensor): output of encoder
-                shape: (batch_size, n_feats, mel_timesteps)
+                shape: (batch_size, n_feats, mel_timesteps) [1, 80, 796]
             mask (torch.Tensor): output_mask
-                shape: (batch_size, 1, mel_timesteps)
-            n_timesteps (int): number of diffusion steps
+                shape: (batch_size, 1, mel_timesteps) [1, 1, 796]
+            n_timesteps (int): number of diffusion steps 10
             temperature (float, optional): temperature for scaling noise. Defaults to 1.0.
-            spks (torch.Tensor, optional): speaker ids. Defaults to None.
-                shape: (batch_size, spk_emb_dim)
-            cond: Not used but kept for future purposes
+            spks (torch.Tensor, optional): speaker ids. Defaults to None. 
+                shape: (batch_size, spk_emb_dim) [1, 80]
+            cond: Not used but kept for future purposes [1, 80, 796]
 
         Returns:
             sample: generated mel-spectrogram
                 shape: (batch_size, n_feats, mel_timesteps)
         """
-
-        z = self.rand_noise[:, :, :mu.size(2)].to(mu.device).to(mu.dtype) * temperature
+        import ipdb; ipdb.set_trace()
+        z = self.rand_noise[:, :, :mu.size(2)].to(mu.device).to(mu.dtype) * temperature # [1, 80, 796]
         # fix prompt and overlap part mu and z
-        t_span = torch.linspace(0, 1, n_timesteps + 1, device=mu.device, dtype=mu.dtype)
+        t_span = torch.linspace(0, 1, n_timesteps + 1, device=mu.device, dtype=mu.dtype) # [0.0, 0.1, ..., 1.0] 一共11个元素
         if self.t_scheduler == 'cosine':
-            t_span = 1 - torch.cos(t_span * 0.5 * torch.pi)
+            t_span = 1 - torch.cos(t_span * 0.5 * torch.pi) # tensor([0.0000, 0.0123, 0.0489, 0.1090, 0.1910, 0.2929, 0.4122, 0.5460, 0.6910, 0.8436, 1.0000], device='cuda:0')
         return self.solve_euler(z, t_span=t_span, mu=mu, mask=mask, spks=spks, cond=cond, streaming=streaming), None
+

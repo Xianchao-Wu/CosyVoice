@@ -310,6 +310,7 @@ class CausalConditionalDecoder(ConditionalDecoder):
         This decoder requires an input with the same shape of the target. So, if your text content
         is shorter or longer than the outputs, please re-sampling it before feeding to the decoder.
         """
+        import ipdb; ipdb.set_trace()
         torch.nn.Module.__init__(self)
         channels = tuple(channels)
         self.in_channels = in_channels
@@ -419,6 +420,7 @@ class CausalConditionalDecoder(ConditionalDecoder):
         Returns:
             _type_: _description_
         """
+        import ipdb; ipdb.set_trace()
         t = self.time_embeddings(t).to(t.dtype)
         t = self.time_mlp(t)
 
@@ -492,3 +494,4 @@ class CausalConditionalDecoder(ConditionalDecoder):
         x = self.final_block(x, mask_up)
         output = self.final_proj(x * mask_up)
         return output * mask
+

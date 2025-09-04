@@ -45,28 +45,29 @@ class CosyVoiceFrontEnd:
                  speech_tokenizer_model: str,
                  spk2info: str = '',
                  allowed_special: str = 'all'):
+        import ipdb; ipdb.set_trace()
         self.tokenizer = get_tokenizer()
         self.feat_extractor = feat_extractor
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         option = onnxruntime.SessionOptions()
         option.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
         option.intra_op_num_threads = 1
-        self.campplus_session = onnxruntime.InferenceSession(campplus_model, sess_options=option, providers=["CPUExecutionProvider"])
+        self.campplus_session = onnxruntime.InferenceSession(campplus_model, sess_options=option, providers=["CPUExecutionProvider"]) # campplus = Content-Aware Multi-scale Pitch ++ 是cosyvoice团队在tts里面用来做 音色建模+音高/韵律特征提取 的模块. NOTE
         self.speech_tokenizer_session = onnxruntime.InferenceSession(speech_tokenizer_model, sess_options=option,
                                                                      providers=["CUDAExecutionProvider" if torch.cuda.is_available() else
                                                                                 "CPUExecutionProvider"])
-        if os.path.exists(spk2info):
+        if os.path.exists(spk2info): # pretrained_models/CosyVoice2-0.5B/spk2info.pt
             self.spk2info = torch.load(spk2info, map_location=self.device)
         else:
             self.spk2info = {}
         self.allowed_special = allowed_special
         self.use_ttsfrd = use_ttsfrd
         if self.use_ttsfrd:
-            self.frd = ttsfrd.TtsFrontendEngine()
-            ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+            self.frd = ttsfrd.TtsFrontendEngine() # <module 'ttsfrd' from '/usr/local/lib/python3.10/dist-packages/ttsfrd.cpython-310-x86_64-linux-gnu.so'>
+            ROOT_DIR = os.path.dirname(os.path.abspath(__file__)) # '/workspace/asr/CosyVoice/cosyvoice/cli'
             assert self.frd.initialize('{}/../../pretrained_models/CosyVoice-ttsfrd/resource'.format(ROOT_DIR)) is True, \
                 'failed to initialize ttsfrd resource'
-            self.frd.set_lang_type('pinyinvg')
+            self.frd.set_lang_type('pinyinvg') # TODO what is vg? pinyin-vg?
         else:
             self.zh_tn_model = ZhNormalizer(remove_erhua=False)
             self.en_tn_model = EnNormalizer()
@@ -78,46 +79,52 @@ class CosyVoiceFrontEnd:
             # NOTE add a dummy text_token_len for compatibility
             return self._extract_text_token_generator(text), torch.tensor([0], dtype=torch.int32).to(self.device)
         else:
-            text_token = self.tokenizer.encode(text, allowed_special=self.allowed_special)
-            text_token = torch.tensor([text_token], dtype=torch.int32).to(self.device)
+            text_token = self.tokenizer.encode(text, allowed_special=self.allowed_special) # list
+            text_token = torch.tensor([text_token], dtype=torch.int32).to(self.device) # torch.Size([1, 50]), batch size=1, seq length=50
             text_token_len = torch.tensor([text_token.shape[1]], dtype=torch.int32).to(self.device)
             return text_token, text_token_len
-
+            # text_token.shape=torch.Size([1, 50]); text_token_len=tensor([50], device='cuda:0', dtype=torch.int32)
     def _extract_text_token_generator(self, text_generator):
         for text in text_generator:
             text_token, _ = self._extract_text_token(text)
             for i in range(text_token.shape[1]):
                 yield text_token[:, i: i + 1]
 
-    def _extract_speech_token(self, speech):
+    def _extract_speech_token(self, speech): # torch.Size([1, 55726])
         assert speech.shape[1] / 16000 <= 30, 'do not support extract speech token for audio longer than 30s'
-        feat = whisper.log_mel_spectrogram(speech, n_mels=128)
-        speech_token = self.speech_tokenizer_session.run(None,
-                                                         {self.speech_tokenizer_session.get_inputs()[0].name:
-                                                          feat.detach().cpu().numpy(),
-                                                          self.speech_tokenizer_session.get_inputs()[1].name:
-                                                          np.array([feat.shape[2]], dtype=np.int32)})[0].flatten().tolist()
-        speech_token = torch.tensor([speech_token], dtype=torch.int32).to(self.device)
-        speech_token_len = torch.tensor([speech_token.shape[1]], dtype=torch.int32).to(self.device)
+        feat = whisper.log_mel_spectrogram(speech, n_mels=128) # [1, 128, 348]
+        speech_token = self.speech_tokenizer_session.run(
+            None,
+            {
+                self.speech_tokenizer_session.get_inputs()[0].name:
+                    feat.detach().cpu().numpy(), # 'feats': [1, 128, 348]
+                self.speech_tokenizer_session.get_inputs()[1].name:
+                    np.array([feat.shape[2]], dtype=np.int32) # 'feats_length': 348
+            }
+        )[0].flatten().tolist()
+        speech_token = torch.tensor([speech_token], dtype=torch.int32).to(self.device) # [1, 87]
+        speech_token_len = torch.tensor([speech_token.shape[1]], dtype=torch.int32).to(self.device) # tensor([87], device='cuda:0', dtype=torch.int32)
         return speech_token, speech_token_len
 
     def _extract_spk_embedding(self, speech):
+        ''' 根据一段语音输出，抽取speaker embedding vector, e.g., [1,55726] -> [1,192]'''
         feat = kaldi.fbank(speech,
                            num_mel_bins=80,
                            dither=0,
-                           sample_frequency=16000)
+                           sample_frequency=16000) # [1, 55726] -> [346, 80] of torch tensor
         feat = feat - feat.mean(dim=0, keepdim=True)
         embedding = self.campplus_session.run(None,
                                               {self.campplus_session.get_inputs()[0].name: feat.unsqueeze(dim=0).cpu().numpy()})[0].flatten().tolist()
         embedding = torch.tensor([embedding]).to(self.device)
-        return embedding
+        return embedding # [1, 55726] -> [1, 192]
 
+    # 抽取一个语音的梅尔谱，例如[1, 83589] -> [1, 174, 80]
     def _extract_speech_feat(self, speech):
-        speech_feat = self.feat_extractor(speech).squeeze(dim=0).transpose(0, 1).to(self.device)
-        speech_feat = speech_feat.unsqueeze(dim=0)
-        speech_feat_len = torch.tensor([speech_feat.shape[1]], dtype=torch.int32).to(self.device)
+        speech_feat = self.feat_extractor(speech).squeeze(dim=0).transpose(0, 1).to(self.device) # functools.partial(<function mel_spectrogram at 0x7f3db5a8dfc0>, n_fft=1920, num_mels=80, sampling_rate=24000, hop_size=480, win_size=1920, fmin=0, fmax=8000, center=False) -> 就是抽取一个语音的梅尔谱 -> [174, 80]
+        speech_feat = speech_feat.unsqueeze(dim=0) # [1, 174, 80]
+        speech_feat_len = torch.tensor([speech_feat.shape[1]], dtype=torch.int32).to(self.device) # tensor([174], device='cuda:0', dtype=torch.int32)
         return speech_feat, speech_feat_len
-
+        # speech_feat.shape=[1, 174, 80], speech_feat_len=174
     def text_normalize(self, text, split=True, text_frontend=True):
         if isinstance(text, Generator):
             logging.info('get tts_text generator, will skip text_normalize!')
@@ -147,7 +154,7 @@ class CosyVoiceFrontEnd:
                                              token_min_n=60, merge_len=20, comma_split=False))
         texts = [i for i in texts if not is_only_punctuation(i)]
         return texts if split is True else text
-
+        # texts=['收到好友从远方寄来的生日礼物，那份意外的惊喜与深深的祝福让我心中充满了甜蜜的快乐，笑容如花儿般绽放。']
     def frontend_sft(self, tts_text, spk_id):
         tts_text_token, tts_text_token_len = self._extract_text_token(tts_text)
         embedding = self.spk2info[spk_id]['embedding']
@@ -158,15 +165,15 @@ class CosyVoiceFrontEnd:
         tts_text_token, tts_text_token_len = self._extract_text_token(tts_text)
         if zero_shot_spk_id == '':
             prompt_text_token, prompt_text_token_len = self._extract_text_token(prompt_text)
-            prompt_speech_resample = torchaudio.transforms.Resample(orig_freq=16000, new_freq=resample_rate)(prompt_speech_16k)
-            speech_feat, speech_feat_len = self._extract_speech_feat(prompt_speech_resample)
-            speech_token, speech_token_len = self._extract_speech_token(prompt_speech_16k)
+            prompt_speech_resample = torchaudio.transforms.Resample(orig_freq=16000, new_freq=resample_rate)(prompt_speech_16k) # 16k -> 24k, 重新采样, [1, 55726] -> [1, 83589]
+            speech_feat, speech_feat_len = self._extract_speech_feat(prompt_speech_resample) # [1, 83589] -> [1, 174, 80], speech_feat_len=174
+            speech_token, speech_token_len = self._extract_speech_token(prompt_speech_16k) # [1, 55726] -> [1,87], speech_token_len=87
             if resample_rate == 24000:
                 # cosyvoice2, force speech_feat % speech_token = 2
-                token_len = min(int(speech_feat.shape[1] / 2), speech_token.shape[1])
-                speech_feat, speech_feat_len[:] = speech_feat[:, :2 * token_len], 2 * token_len
-                speech_token, speech_token_len[:] = speech_token[:, :token_len], token_len
-            embedding = self._extract_spk_embedding(prompt_speech_16k)
+                token_len = min(int(speech_feat.shape[1] / 2), speech_token.shape[1]) # min(174/2, 87) -> 87 = token_len
+                speech_feat, speech_feat_len[:] = speech_feat[:, :2 * token_len], 2 * token_len # NOTE no change of values here
+                speech_token, speech_token_len[:] = speech_token[:, :token_len], token_len # no change [1, 174, 80] and 174
+            embedding = self._extract_spk_embedding(prompt_speech_16k) # [1, 55726] -> [1, 192]
             model_input = {'prompt_text': prompt_text_token, 'prompt_text_len': prompt_text_token_len,
                            'llm_prompt_speech_token': speech_token, 'llm_prompt_speech_token_len': speech_token_len,
                            'flow_prompt_speech_token': speech_token, 'flow_prompt_speech_token_len': speech_token_len,
@@ -174,8 +181,8 @@ class CosyVoiceFrontEnd:
                            'llm_embedding': embedding, 'flow_embedding': embedding}
         else:
             model_input = self.spk2info[zero_shot_spk_id]
-        model_input['text'] = tts_text_token
-        model_input['text_len'] = tts_text_token_len
+        model_input['text'] = tts_text_token # '收到好友从远方寄来的生日礼物，那份意外的惊喜与深深的祝福让我心中充满了甜蜜的快乐，笑容如花儿般绽放。' -> text tokenizer -> [1,50]
+        model_input['text_len'] = tts_text_token_len # tensor([50], device='cuda:0', dtype=torch.int32)
         return model_input
 
     def frontend_cross_lingual(self, tts_text, prompt_speech_16k, resample_rate, zero_shot_spk_id):

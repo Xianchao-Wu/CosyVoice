@@ -262,43 +262,44 @@ class Qwen2Encoder(torch.nn.Module):
 class Qwen2LM(TransformerLM):
     def __init__(
             self,
-            llm_input_size: int,
-            llm_output_size: int,
-            speech_token_size: int,
-            llm: torch.nn.Module,
-            sampling: Callable,
-            length_normalized_loss: bool = True,
-            lsm_weight: float = 0.0,
-            mix_ratio: List[int] = [5, 15],
+            llm_input_size: int, # 896
+            llm_output_size: int, # 896
+            speech_token_size: int, # 6561 = 3^8 = 81 * 81
+            llm: torch.nn.Module, # Qwen2Encoder
+            sampling: Callable, # functools.partial(<function ras_sampling at 0x7faed0974310>, top_p=0.8, top_k=25, win_size=10, tau_r=0.1)
+            length_normalized_loss: bool = True, # True
+            lsm_weight: float = 0.0, # 0, label smoothing weight
+            mix_ratio: List[int] = [5, 15], # N=5, M=15 for streaming TTS
     ):
+        import ipdb; ipdb.set_trace()
         torch.nn.Module.__init__(self)
-        self.llm_input_size = llm_input_size
-        self.llm_output_size = llm_output_size
-        self.speech_token_size = speech_token_size
+        self.llm_input_size = llm_input_size # 896
+        self.llm_output_size = llm_output_size # 896
+        self.speech_token_size = speech_token_size # 6561=3^8
         # 2. build speech token language model related modules
         self.sos_eos = 0
         self.task_id = 1
         self.fill_token = 2
 
-        self.llm_embedding = torch.nn.Embedding(2, llm_input_size)
+        self.llm_embedding = torch.nn.Embedding(2, llm_input_size) # (2, 896)
         self.llm = llm
-        self.llm_decoder = nn.Linear(llm_output_size, speech_token_size + 3)
+        self.llm_decoder = nn.Linear(llm_output_size, speech_token_size + 3) # Linear(in_features=896, out_features=6564, bias=True)
         self.criterion_ce = LabelSmoothingLoss(
             size=speech_token_size + 3,
-            padding_idx=IGNORE_ID,
-            smoothing=lsm_weight,
-            normalize_length=length_normalized_loss,
-        )
+            padding_idx=IGNORE_ID, # -1
+            smoothing=lsm_weight, # 0
+            normalize_length=length_normalized_loss, # True
+        ) # <class 'cosyvoice.transformer.label_smoothing_loss.LabelSmoothingLoss'>
 
         # 3. [Optional] build speech token related modules
-        self.speech_embedding = torch.nn.Embedding(speech_token_size + 3, llm_input_size)
+        self.speech_embedding = torch.nn.Embedding(speech_token_size + 3, llm_input_size) # Embedding(6564, 896)
 
         # 4. sampling method
-        self.sampling = sampling
-        self.mix_ratio = mix_ratio
+        self.sampling = sampling # functools.partial(<function ras_sampling at 0x7faed0974310>, top_p=0.8, top_k=25, win_size=10, tau_r=0.1)
+        self.mix_ratio = mix_ratio # [5, 15]
 
         # 5. vllm related
-        self.stop_token_ids = [speech_token_size + i for i in range(3)]
+        self.stop_token_ids = [speech_token_size + i for i in range(3)] # S T E, S=start_of_seq, E=end_of_seq, T=between text and speech; [6561, 6562, 6563]
         self.vllm_output_queue = {}
 
     def prepare_lm_input_target(self, text_token, text_token_emb, text_token_len, speech_token, speech_token_emb, speech_token_len):

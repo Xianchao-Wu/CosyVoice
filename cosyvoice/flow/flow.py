@@ -168,29 +168,31 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
                                                           'n_blocks': 4, 'num_mid_blocks': 12, 'num_heads': 8, 'act_fn': 'gelu'}},
                  mel_feat_conf: Dict = {'n_fft': 1024, 'num_mels': 80, 'sampling_rate': 22050,
                                         'hop_size': 256, 'win_size': 1024, 'fmin': 0, 'fmax': 8000}):
+        import ipdb; ipdb.set_trace()
         super().__init__()
-        self.input_size = input_size
-        self.output_size = output_size
-        self.decoder_conf = decoder_conf
-        self.mel_feat_conf = mel_feat_conf
-        self.vocab_size = vocab_size
-        self.output_type = output_type
-        self.input_frame_rate = input_frame_rate
+        self.input_size = input_size # 512
+        self.output_size = output_size # 80
+        self.decoder_conf = decoder_conf # {'in_channels': 240, 'out_channel': 80, 'spk_emb_dim': 80, 'n_spks': 1, 'cfm_params': {'sigma_min': 1e-06, 'solver': 'euler', 't_scheduler': 'cosine', 'training_cfg_rate': 0.2, 'inference_cfg_rate': 0.7, 'reg_loss_type': 'l1'}, 'decoder_params': {'channels': [256, 256], 'dropout': 0.0, 'attention_head_dim': 64, 'n_blocks': 4, 'num_mid_blocks': 12, 'num_heads': 8, 'act_fn': 'gelu'}}
+        self.mel_feat_conf = mel_feat_conf # {'n_fft': 1024, 'num_mels': 80, 'sampling_rate': 22050, 'hop_size': 256, 'win_size': 1024, 'fmin': 0, 'fmax': 8000}
+        self.vocab_size = vocab_size # 6561 # NOTE 这里没有三个特殊的tokens, E, S, T, 6561=81*81=3^8
+        self.output_type = output_type # 'mel'
+        self.input_frame_rate = input_frame_rate # 25
         logging.info(f"input frame rate={self.input_frame_rate}")
-        self.input_embedding = nn.Embedding(vocab_size, input_size)
-        self.spk_embed_affine_layer = torch.nn.Linear(spk_embed_dim, output_size)
-        self.encoder = encoder
-        self.encoder_proj = torch.nn.Linear(self.encoder.output_size(), output_size)
-        self.decoder = decoder
-        self.only_mask_loss = only_mask_loss
-        self.token_mel_ratio = token_mel_ratio
-        self.pre_lookahead_len = pre_lookahead_len
+        self.input_embedding = nn.Embedding(vocab_size, input_size) # (6561, 512)
+        self.spk_embed_affine_layer = torch.nn.Linear(spk_embed_dim, output_size) # Linear(in_features=192, out_features=80, bias=True)
+        self.encoder = encoder # <class 'cosyvoice.transformer.upsample_encoder.UpsampleConformerEncoder'> NOTE
+        self.encoder_proj = torch.nn.Linear(self.encoder.output_size(), output_size) # (512, 80)
+        self.decoder = decoder # <class 'cosyvoice.flow.flow_matching.CausalConditionalCFM'>
+        self.only_mask_loss = only_mask_loss # True
+        self.token_mel_ratio = token_mel_ratio # 2 TODO for what?
+        self.pre_lookahead_len = pre_lookahead_len # 3 TODO for what?
 
     def forward(
             self,
             batch: dict,
             device: torch.device,
     ) -> Dict[str, Optional[torch.Tensor]]:
+        import ipdb; ipdb.set_trace()
         token = batch['speech_token'].to(device)
         token_len = batch['speech_token_len'].to(device)
         feat = batch['speech_feat'].to(device)
@@ -243,6 +245,7 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
                   embedding,
                   streaming,
                   finalize):
+        import ipdb; ipdb.set_trace()
         assert token.shape[0] == 1
         # xvec projection
         embedding = F.normalize(embedding, dim=1)

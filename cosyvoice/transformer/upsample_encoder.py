@@ -163,14 +163,15 @@ class UpsampleConformerEncoder(torch.nn.Module):
             gradient_checkpointing: rerunning a forward-pass segment for each
                 checkpointed segment during backward.
         """
+        import ipdb; ipdb.set_trace()
         super().__init__()
-        self._output_size = output_size
+        self._output_size = output_size # 512
 
         self.global_cmvn = global_cmvn
         self.embed = COSYVOICE_SUBSAMPLE_CLASSES[input_layer](
-            input_size,
-            output_size,
-            dropout_rate,
+            input_size, # 512
+            output_size, # 512
+            dropout_rate, # 0.1
             COSYVOICE_EMB_CLASSES[pos_enc_layer_type](output_size,
                                                       positional_dropout_rate),
         )

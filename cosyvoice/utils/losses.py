@@ -4,6 +4,7 @@ from typing import Tuple
 
 
 def tpr_loss(disc_real_outputs, disc_generated_outputs, tau):
+    import ipdb; ipdb.set_trace()
     loss = 0
     for dr, dg in zip(disc_real_outputs, disc_generated_outputs):
         m_DG = torch.median((dr - dg))
@@ -13,6 +14,7 @@ def tpr_loss(disc_real_outputs, disc_generated_outputs, tau):
 
 
 def mel_loss(real_speech, generated_speech, mel_transforms):
+    import ipdb; ipdb.set_trace()
     loss = 0
     for transform in mel_transforms:
         mel_r = transform(real_speech)
@@ -27,6 +29,7 @@ class DPOLoss(torch.nn.Module):
     """
 
     def __init__(self, beta: float, label_smoothing: float = 0.0, ipo: bool = False) -> None:
+        import ipdb; ipdb.set_trace()
         super().__init__()
         self.beta = beta
         self.label_smoothing = label_smoothing
@@ -39,6 +42,7 @@ class DPOLoss(torch.nn.Module):
         reference_chosen_logps: torch.Tensor,
         reference_rejected_logps: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        import ipdb; ipdb.set_trace()
         pi_logratios = policy_chosen_logps - policy_rejected_logps
         ref_logratios = reference_chosen_logps - reference_rejected_logps
         logits = pi_logratios - ref_logratios

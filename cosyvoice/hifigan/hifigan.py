@@ -4,20 +4,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 from matcha.hifigan.models import feature_loss, generator_loss, discriminator_loss
 from cosyvoice.utils.losses import tpr_loss, mel_loss
-
+# TPR = truncated Pointwise Relativistic? TODO
 
 class HiFiGan(nn.Module):
     def __init__(self, generator, discriminator, mel_spec_transform,
                  multi_mel_spectral_recon_loss_weight=45, feat_match_loss_weight=2.0,
                  tpr_loss_weight=1.0, tpr_loss_tau=0.04):
+        import ipdb; ipdb.set_trace()
         super(HiFiGan, self).__init__()
-        self.generator = generator
-        self.discriminator = discriminator
-        self.mel_spec_transform = mel_spec_transform
-        self.multi_mel_spectral_recon_loss_weight = multi_mel_spectral_recon_loss_weight
-        self.feat_match_loss_weight = feat_match_loss_weight
-        self.tpr_loss_weight = tpr_loss_weight
-        self.tpr_loss_tau = tpr_loss_tau
+        self.generator = generator # <class 'cosyvoice.hifigan.generator.HiFTGenerator'>
+        self.discriminator = discriminator # <class 'cosyvoice.hifigan.discriminator.MultipleDiscriminator'>
+        self.mel_spec_transform = mel_spec_transform # [functools.partial(<function mel_spectrogram at 0x7fd03302e710>, n_fft=1920, num_mels=80, sampling_rate=24000, hop_size=480, win_size=1920, fmin=0, fmax=None, center=False)]
+        self.multi_mel_spectral_recon_loss_weight = multi_mel_spectral_recon_loss_weight # 45
+        self.feat_match_loss_weight = feat_match_loss_weight # 2.0
+        self.tpr_loss_weight = tpr_loss_weight # 1.0
+        self.tpr_loss_tau = tpr_loss_tau # 0.04
 
     def forward(
             self,
@@ -30,6 +31,7 @@ class HiFiGan(nn.Module):
             return self.forward_discriminator(batch, device)
 
     def forward_generator(self, batch, device):
+        import ipdb; ipdb.set_trace()
         real_speech = batch['speech'].to(device)
         pitch_feat = batch['pitch_feat'].to(device)
         # 1. calculate generator outputs
@@ -51,6 +53,7 @@ class HiFiGan(nn.Module):
         return {'loss': loss, 'loss_gen': loss_gen, 'loss_fm': loss_fm, 'loss_mel': loss_mel, 'loss_tpr': loss_tpr, 'loss_f0': loss_f0}
 
     def forward_discriminator(self, batch, device):
+        import ipdb; ipdb.set_trace()
         real_speech = batch['speech'].to(device)
         # 1. calculate generator outputs
         with torch.no_grad():
@@ -65,3 +68,4 @@ class HiFiGan(nn.Module):
             loss_tpr = torch.zeros(1).to(device)
         loss = loss_disc + self.tpr_loss_weight * loss_tpr
         return {'loss': loss, 'loss_disc': loss_disc, 'loss_tpr': loss_tpr}
+
