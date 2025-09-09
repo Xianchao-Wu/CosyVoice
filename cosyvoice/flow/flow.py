@@ -242,43 +242,43 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
                   prompt_token_len,
                   prompt_feat,
                   prompt_feat_len,
-                  embedding,
+                  embedding, # speaker embedding, extracted from ref voice
                   streaming,
                   finalize):
         import ipdb; ipdb.set_trace()
         assert token.shape[0] == 1
         # xvec projection
-        embedding = F.normalize(embedding, dim=1)
-        embedding = self.spk_embed_affine_layer(embedding)
+        embedding = F.normalize(embedding, dim=1) # [1, 192] -> [1, 192]
+        embedding = self.spk_embed_affine_layer(embedding) # [1,192] -> Linear(192, 80) -> [1,80]
 
         # concat text and prompt_text
         token, token_len = torch.concat([prompt_token, token], dim=1), prompt_token_len + token_len
         mask = (~make_pad_mask(token_len)).unsqueeze(-1).to(embedding)
-        token = self.input_embedding(torch.clamp(token, min=0)) * mask
+        token = self.input_embedding(torch.clamp(token, min=0)) * mask # [1,398] -> Embedding(6561, 512) -> [1, 398, 512]
 
         # text encode
         if finalize is True:
-            h, h_lengths = self.encoder(token, token_len, streaming=streaming)
+            h, h_lengths = self.encoder(token, token_len, streaming=streaming) # NOTE h.shape=[1, 796, 512] NOTE up sampling conformer encoder layers
         else:
             token, context = token[:, :-self.pre_lookahead_len], token[:, -self.pre_lookahead_len:]
             h, h_lengths = self.encoder(token, token_len, context=context, streaming=streaming)
-        mel_len1, mel_len2 = prompt_feat.shape[1], h.shape[1] - prompt_feat.shape[1]
-        h = self.encoder_proj(h)
+        mel_len1, mel_len2 = prompt_feat.shape[1], h.shape[1] - prompt_feat.shape[1] # 174, 796-174=622
+        h = self.encoder_proj(h) # [1, 796, 512] -> Linear(512, 80) -> [1, 796, 80]
 
         # get conditions
-        conds = torch.zeros([1, mel_len1 + mel_len2, self.output_size], device=token.device).to(h.dtype)
-        conds[:, :mel_len1] = prompt_feat
+        conds = torch.zeros([1, mel_len1 + mel_len2, self.output_size], device=token.device).to(h.dtype) # [1, 174+622, 80]
+        conds[:, :mel_len1] = prompt_feat # 前面的174个位置放的是prompt feat of mel-spectrogram
         conds = conds.transpose(1, 2)
 
-        mask = (~make_pad_mask(torch.tensor([mel_len1 + mel_len2]))).to(h)
+        mask = (~make_pad_mask(torch.tensor([mel_len1 + mel_len2]))).to(h) # [1, 796] all 1
         feat, _ = self.decoder(
-            mu=h.transpose(1, 2).contiguous(),
-            mask=mask.unsqueeze(1),
-            spks=embedding,
-            cond=conds,
+            mu=h.transpose(1, 2).contiguous(), # [1, 80, 796]
+            mask=mask.unsqueeze(1), # [1, 1, 796]
+            spks=embedding, # [1, 80]
+            cond=conds, # [1, 80, 796]
             n_timesteps=10,
-            streaming=streaming
-        )
-        feat = feat[:, :, mel_len1:]
+            streaming=streaming # False
+        ) # NOTE CausalConditionalCFM feat.shape=[1, 80, 796]
+        feat = feat[:, :, mel_len1:] # [1, 80, 622] ? NOTE 难道说，这是622个位置的梅尔谱，一次成型了？？？ 只需要十次loop (t=0 to 1 with [0, ..., 1] totally 11 timepoints) -> 是的，是一次成型了!
         assert feat.shape[2] == mel_len2
-        return feat.float(), None
+        return feat.float(), None # [1, 80, 622]

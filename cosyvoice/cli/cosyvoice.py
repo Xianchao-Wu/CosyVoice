@@ -74,7 +74,7 @@ class CosyVoice:
         model_input = self.frontend.frontend_zero_shot('', prompt_text, prompt_speech_16k, self.sample_rate, '')
         del model_input['text']
         del model_input['text_len']
-        self.frontend.spk2info[zero_shot_spk_id] = model_input
+        self.frontend.spk2info[zero_shot_spk_id] = model_input # 'my_zero_shot_spk': model_input with 10 elements
         return True
 
     def save_spkinfo(self):
@@ -97,7 +97,7 @@ class CosyVoice:
         for i in tqdm(self.frontend.text_normalize(tts_text, split=True, text_frontend=text_frontend)):
             if (not isinstance(i, Generator)) and len(i) < 0.5 * len(prompt_text):
                 logging.warning('synthesis text {} too short than prompt text {}, this may lead to bad performance'.format(i, prompt_text))
-            model_input = self.frontend.frontend_zero_shot(i, prompt_text, prompt_speech_16k, self.sample_rate, zero_shot_spk_id) # prompt_speech_16k.shape=[1, 55726]
+            model_input = self.frontend.frontend_zero_shot(i, prompt_text, prompt_speech_16k, self.sample_rate, zero_shot_spk_id) # 1. i是待tts的文本；2. prompt_text是提示文本，3. prompt_speech_16k.shape=[1, 55726]是提示文本对应的语音，4. self.sample_rate=24k, 5. zero_shot_spk_id=''是speaker id NOTE
             start_time = time.time()
             logging.info('synthesis text {}'.format(i))
             for model_output in self.model.tts(**model_input, stream=stream, speed=speed): # <class 'cosyvoice.cli.model.CosyVoice2Model'>
@@ -170,7 +170,7 @@ class CosyVoice2(CosyVoice):
             logging.warning('no cuda device, set load_jit/load_trt/fp16 to False')
 
         import ipdb; ipdb.set_trace()
-        self.model = CosyVoice2Model(configs['llm'], configs['flow'], configs['hift'], fp16)
+        self.model = CosyVoice2Model(configs['llm'], configs['flow'], configs['hift'], fp16) # NOTE
         self.model.load('{}/llm.pt'.format(model_dir),
                         '{}/flow.pt'.format(model_dir),
                         '{}/hift.pt'.format(model_dir))

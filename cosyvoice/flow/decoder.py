@@ -294,17 +294,17 @@ class ConditionalDecoder(nn.Module):
 class CausalConditionalDecoder(ConditionalDecoder):
     def __init__(
         self,
-        in_channels,
-        out_channels,
-        channels=(256, 256),
-        dropout=0.05,
+        in_channels, # 320
+        out_channels, # 80
+        channels=(256, 256), # [256]
+        dropout=0.05, # 0.0
         attention_head_dim=64,
-        n_blocks=1,
-        num_mid_blocks=2,
-        num_heads=4,
-        act_fn="snake",
+        n_blocks=1, # 4
+        num_mid_blocks=2, # 12
+        num_heads=4, # 8
+        act_fn="snake", # 'gelu'
         static_chunk_size=50,
-        num_decoding_left_chunks=2,
+        num_decoding_left_chunks=2, # -1
     ):
         """
         This decoder requires an input with the same shape of the target. So, if your text content
@@ -407,10 +407,11 @@ class CausalConditionalDecoder(ConditionalDecoder):
         """Forward pass of the UNet1DConditional model.
 
         Args:
-            x (torch.Tensor): shape (batch_size, in_channels, time)
-            mask (_type_): shape (batch_size, 1, time)
-            t (_type_): shape (batch_size)
-            spks (_type_, optional): shape: (batch_size, condition_channels). Defaults to None.
+            x (torch.Tensor): shape (batch_size, in_channels, time) # [2, 80, 796], noise, 噪声
+            mask (_type_): shape (batch_size, 1, time) # [2, 1, 796], all 1, 掩码mask
+            mu : shape (batch_size, in_channels, time) # [2, 80, 796] 
+            t (_type_): shape (batch_size) # tensor([0., 0.], device='cuda:0'), 时间点信息
+            spks (_type_, optional): shape: (batch_size, condition_channels). Defaults to None. # [2, 80], 0-th is speaker embedding vector extracted from reference voice; 1-th is all 0, 说话人向量，后一个还是全0，有意思
             cond (_type_, optional): placeholder for future use. Defaults to None.
 
         Raises:
@@ -421,61 +422,61 @@ class CausalConditionalDecoder(ConditionalDecoder):
             _type_: _description_
         """
         import ipdb; ipdb.set_trace()
-        t = self.time_embeddings(t).to(t.dtype)
-        t = self.time_mlp(t)
+        t = self.time_embeddings(t).to(t.dtype) # SinusoidalPosEmb(), [2] -> [2, 320]
+        t = self.time_mlp(t) # linear(320, 1024) -> SiLU() -> linear(1024, 1024); for t [2, 320] -> [2, 1024]
 
-        x = pack([x, mu], "b * t")[0]
+        x = pack([x, mu], "b * t")[0] # NOTE [2, 80, 796] + [2, 80, 796] -> [2, 160, 796] 这是把噪声+来自语音speech token的信息，拼接起来
 
         if spks is not None:
-            spks = repeat(spks, "b c -> b c t", t=x.shape[-1])
-            x = pack([x, spks], "b * t")[0]
+            spks = repeat(spks, "b c -> b c t", t=x.shape[-1]) # [2, 80] -> 一个数字重复了796次 -> [2, 80, 796]
+            x = pack([x, spks], "b * t")[0] # 就是把中间的一个维度拼接一下, [2, 160, 796] + [2, 80, 796] -> [2, 240, 796]
         if cond is not None:
-            x = pack([x, cond], "b * t")[0]
+            x = pack([x, cond], "b * t")[0] # [2, 240, 796] + [2, 80, 796] -> [2, 320, 796]
 
         hiddens = []
         masks = [mask]
-        for resnet, transformer_blocks, downsample in self.down_blocks:
-            mask_down = masks[-1]
-            x = resnet(x, mask_down, t)
-            x = rearrange(x, "b c t -> b t c").contiguous()
+        for resnet, transformer_blocks, downsample in self.down_blocks: # NOTE 1-layer in down blocks
+            mask_down = masks[-1] # [2, 1, 796]
+            x = resnet(x, mask_down, t) # -> [2, 256, 796]
+            x = rearrange(x, "b c t -> b t c").contiguous() # [2, 256, 796] -> [2, 796, 256]
             if streaming is True:
                 attn_mask = add_optional_chunk_mask(x, mask_down.bool(), False, False, 0, self.static_chunk_size, -1)
             else:
-                attn_mask = add_optional_chunk_mask(x, mask_down.bool(), False, False, 0, 0, -1).repeat(1, x.size(1), 1)
-            attn_mask = mask_to_bias(attn_mask, x.dtype)
+                attn_mask = add_optional_chunk_mask(x, mask_down.bool(), False, False, 0, 0, -1).repeat(1, x.size(1), 1) # [2, 796, 796]
+            attn_mask = mask_to_bias(attn_mask, x.dtype) # from all True to all '-0', same shape of [2, 796, 796]
             for transformer_block in transformer_blocks:
                 x = transformer_block(
-                    hidden_states=x,
-                    attention_mask=attn_mask,
-                    timestep=t,
-                )
-            x = rearrange(x, "b t c -> b c t").contiguous()
+                    hidden_states=x, # [2, 796, 256]
+                    attention_mask=attn_mask, # [2, 796, 796]
+                    timestep=t, # [2, 1024]
+                ) # x.shape=[2, 796, 256]
+            x = rearrange(x, "b t c -> b c t").contiguous() # [2, 796, 256] -> [2, 256, 796]
             hiddens.append(x)  # Save hidden states for skip connections
-            x = downsample(x * mask_down)
-            masks.append(mask_down[:, :, ::2])
+            x = downsample(x * mask_down) # [2, 256, 796] * all 1 (2, 1, 796) -> CausalConv1d(256, 256, kernel_size=(3,), stride=(1,)) -> [2, 256, 796]
+            masks.append(mask_down[:, :, ::2]) # [2, 1, 398] all 1
         masks = masks[:-1]
-        mask_mid = masks[-1]
+        mask_mid = masks[-1] # [2, 1, 796] of all 1
 
-        for resnet, transformer_blocks in self.mid_blocks:
-            x = resnet(x, mask_mid, t)
-            x = rearrange(x, "b c t -> b t c").contiguous()
+        for resnet, transformer_blocks in self.mid_blocks: # NOTE 12 layers in middle blocks
+            x = resnet(x, mask_mid, t) # x.shape=[2,256,796], mask_mid.shape=[2,1,796], t.shape=[2,1024] -> [2, 256, 796]
+            x = rearrange(x, "b c t -> b t c").contiguous() # [2, 256, 796] -> [2, 796, 256]
             if streaming is True:
                 attn_mask = add_optional_chunk_mask(x, mask_mid.bool(), False, False, 0, self.static_chunk_size, -1)
             else:
                 attn_mask = add_optional_chunk_mask(x, mask_mid.bool(), False, False, 0, 0, -1).repeat(1, x.size(1), 1)
-            attn_mask = mask_to_bias(attn_mask, x.dtype)
+            attn_mask = mask_to_bias(attn_mask, x.dtype) # [2, 796, 796] of all True -> all '-0'
             for transformer_block in transformer_blocks:
                 x = transformer_block(
-                    hidden_states=x,
-                    attention_mask=attn_mask,
-                    timestep=t,
-                )
-            x = rearrange(x, "b t c -> b c t").contiguous()
+                    hidden_states=x, # [2, 796, 256]
+                    attention_mask=attn_mask, # [2, 796, 796]
+                    timestep=t, # [2, 1024]
+                ) # -> x.shape=[2, 796, 256]
+            x = rearrange(x, "b t c -> b c t").contiguous() # [2, 796, 256] -> [2, 256, 796]
 
-        for resnet, transformer_blocks, upsample in self.up_blocks:
-            mask_up = masks.pop()
-            skip = hiddens.pop()
-            x = pack([x[:, :, :skip.shape[-1]], skip], "b * t")[0]
+        for resnet, transformer_blocks, upsample in self.up_blocks: # NOTE 1-layer in up blocks
+            mask_up = masks.pop() # [2, 1, 796]
+            skip = hiddens.pop() # skip.shape=[2, 256, 796]
+            x = pack([x[:, :, :skip.shape[-1]], skip], "b * t")[0] # -> [2, 512, 796]
             x = resnet(x, mask_up, t)
             x = rearrange(x, "b c t -> b t c").contiguous()
             if streaming is True:
@@ -489,9 +490,9 @@ class CausalConditionalDecoder(ConditionalDecoder):
                     attention_mask=attn_mask,
                     timestep=t,
                 )
-            x = rearrange(x, "b t c -> b c t").contiguous()
-            x = upsample(x * mask_up)
-        x = self.final_block(x, mask_up)
-        output = self.final_proj(x * mask_up)
-        return output * mask
+            x = rearrange(x, "b t c -> b c t").contiguous() # [2, 796, 256] -> [2, 256, 796]
+            x = upsample(x * mask_up) # -> CausalConv1d(256, 256, kernel_size=(3,), stride=(1,)) -> [2, 256, 796]
+        x = self.final_block(x, mask_up) # [2, 256, 796], [2, 1, 796] -> [2, 256, 796]
+        output = self.final_proj(x * mask_up) # Conv1d(256, 80, kernel_size=(1,), stride=(1,)) -> [2, 80, 796]
+        return output * mask # [2, 80, 796] * [2, 1, 796] -> [2, 80, 796]
 

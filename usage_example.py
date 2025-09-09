@@ -12,26 +12,30 @@ prompt_speech_16k = load_wav('./asset/zero_shot_prompt.wav', 16000)
 
 # NOTE inference_zero_shot
 for i, j in enumerate(cosyvoice.inference_zero_shot('收到好友从远方寄来的生日礼物，那份意外的惊喜与深深的祝福让我心中充满了甜蜜的快乐，笑容如花儿般绽放。', '希望你以后能够做的比我还好呦。', prompt_speech_16k, stream=False)):
-    torchaudio.save('zero_shot_{}.wav'.format(i), j['tts_speech'], cosyvoice.sample_rate)
+    import ipdb; ipdb.set_trace()
+    torchaudio.save('1_zero_shot_{}.wav'.format(i), j['tts_speech'], cosyvoice.sample_rate)
 
 # NOTE add_zero_shot_spk
 # save zero_shot spk for future usage
-assert cosyvoice.add_zero_shot_spk('希望你以后能够做的比我还好呦。', prompt_speech_16k, 'my_zero_shot_spk') is True
+assert cosyvoice.add_zero_shot_spk('希望你以后能够做的比我还好呦。', prompt_speech_16k, 'my_zero_shot_spk') is True # TODO 重要的是，这里的'my_zero_shot_spk'对应的speaker embedding vector信息，是之前的reference voice对应的speaker embedding vector拿到的.
 
 # NOTE inference_zero_shot
-for i, j in enumerate(cosyvoice.inference_zero_shot('收到好友从远方寄来的生日礼物，那份意外的惊喜与深深的祝福让我心中充满了甜蜜的快乐，笑容如花儿般绽放。', '', '', zero_shot_spk_id='my_zero_shot_spk', stream=False)):
-    torchaudio.save('zero_shot_{}.wav'.format(i), j['tts_speech'], cosyvoice.sample_rate)
+for i, j in enumerate(cosyvoice.inference_zero_shot('收到好友从远方寄来的生日礼物，那份意外的惊喜与深深的祝福让我心中充满了甜蜜的快乐，笑容如花儿般绽放。', '', '', zero_shot_spk_id='my_zero_shot_spk', stream=False)): # TODO 需要注意的是，这里使用的是已有的speaker vector，"my_zero_shot_spk"。
+    import ipdb; ipdb.set_trace()
+    torchaudio.save('2_zero_shot_my_zero_shot_spk{}.wav'.format(i), j['tts_speech'], cosyvoice.sample_rate)
 cosyvoice.save_spkinfo()
 
 # NOTE inference_cross_lingual
 # fine grained control, for supported control, check cosyvoice/tokenizer/tokenizer.py#L248
 for i, j in enumerate(cosyvoice.inference_cross_lingual('在他讲述那个荒诞故事的过程中，他突然[laughter]停下来，因为他自己也被逗笑了[laughter]。', prompt_speech_16k, stream=False)):
-    torchaudio.save('fine_grained_control_{}.wav'.format(i), j['tts_speech'], cosyvoice.sample_rate)
+    import ipdb; ipdb.set_trace()
+    torchaudio.save('3_fine_grained_control_{}.wav'.format(i), j['tts_speech'], cosyvoice.sample_rate)
 
 # NOTE inference_instruct2
 # instruct usage
 for i, j in enumerate(cosyvoice.inference_instruct2('收到好友从远方寄来的生日礼物，那份意外的惊喜与深深的祝福让我心中充满了甜蜜的快乐，笑容如花儿般绽放。', '用四川话说这句话', prompt_speech_16k, stream=False)):
-    torchaudio.save('instruct_{}.wav'.format(i), j['tts_speech'], cosyvoice.sample_rate)
+    import ipdb; ipdb.set_trace()
+    torchaudio.save('4_instruct_{}.wav'.format(i), j['tts_speech'], cosyvoice.sample_rate)
 
 # bistream usage, you can use generator as input, this is useful when using text llm model as input
 # NOTE you should still have some basic sentence split logic because llm can not handle arbitrary sentence length
@@ -43,4 +47,5 @@ def text_generator():
 
 # NOTE inference_zero_shot
 for i, j in enumerate(cosyvoice.inference_zero_shot(text_generator(), '希望你以后能够做的比我还好呦。', prompt_speech_16k, stream=False)):
-    torchaudio.save('zero_shot_{}.wav'.format(i), j['tts_speech'], cosyvoice.sample_rate)
+    import ipdb; ipdb.set_trace()
+    torchaudio.save('5_zero_shot_xiwang_{}.wav'.format(i), j['tts_speech'], cosyvoice.sample_rate)

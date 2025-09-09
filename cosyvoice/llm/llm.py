@@ -39,7 +39,7 @@ class TransformerLM(torch.nn.Module):
             speech_token_size: int,
             text_encoder: torch.nn.Module,
             llm: torch.nn.Module,
-            sampling: Callable,
+            sampling: Callable, # > /workspace/asr/CosyVoice/cosyvoice/utils/common.py(111)ras_sampling()
             length_normalized_loss: bool = True,
             lsm_weight: float = 0.0,
             spk_embed_dim: int = 192,
@@ -58,7 +58,7 @@ class TransformerLM(torch.nn.Module):
         # 2. build speech token language model related modules
         self.sos_eos = 0
         self.task_id = 1
-        self.llm_embedding = torch.nn.Embedding(2, llm_input_size)
+        self.llm_embedding = torch.nn.Embedding(2, llm_input_size) # self.sos_eos (0), self.task_id (1)
         self.llm = llm
         self.llm_decoder = nn.Linear(llm_output_size, speech_token_size + 1)
         self.criterion_ce = LabelSmoothingLoss(
@@ -73,7 +73,7 @@ class TransformerLM(torch.nn.Module):
         self.spk_embed_affine_layer = torch.nn.Linear(spk_embed_dim, llm_input_size)
 
         # 4. sampling method
-        self.sampling = sampling
+        self.sampling = sampling # > /workspace/asr/CosyVoice/cosyvoice/utils/common.py(111)ras_sampling()
 
     def encode(
             self,
@@ -146,7 +146,7 @@ class TransformerLM(torch.nn.Module):
 
     def sampling_ids(
             self,
-            weighted_scores: torch.Tensor,
+            weighted_scores: torch.Tensor, # torch.Size([6564])
             decoded_tokens: List,
             sampling: int,
             ignore_eos: bool = True,
@@ -159,7 +159,7 @@ class TransformerLM(torch.nn.Module):
             num_trials += 1
             if num_trials > max_trials:
                 raise RuntimeError('sampling reaches max_trials {} and still get eos when ignore_eos is True, check your input!'.format(max_trials))
-        return top_ids
+        return top_ids # 成功采样一个token出来!
 
     @torch.inference_mode()
     def inference(
@@ -232,7 +232,7 @@ class Qwen2Encoder(torch.nn.Module):
     def __init__(self, pretrain_path):
         super().__init__()
         self.model = Qwen2ForCausalLM.from_pretrained(pretrain_path)
-
+        # <class 'transformers.models.qwen2.modeling_qwen2.Qwen2ForCausalLM'>
     def forward(self, xs: torch.Tensor, xs_lens: torch.Tensor):
         T = xs.size(1)
         masks = ~make_pad_mask(xs_lens, T)
@@ -245,16 +245,16 @@ class Qwen2Encoder(torch.nn.Module):
         return outs.hidden_states[-1], masks.unsqueeze(1)
 
     def forward_one_step(self, xs, masks, cache=None):
-        input_masks = masks[:, -1, :]
-        outs = self.model(
-            inputs_embeds=xs,
-            attention_mask=input_masks,
+        input_masks = masks[:, -1, :] # [1, 154,154] -> [1, 154] all True
+        outs = self.model( # <class 'transformers.models.qwen2.modeling_qwen2.Qwen2ForCausalLM'>
+            inputs_embeds=xs, # [1, 154, 896] = [1, 1+65+1+87, 896]
+            attention_mask=input_masks, # [1, 154], all True
             output_hidden_states=True,
             return_dict=True,
             use_cache=True,
             past_key_values=cache,
-        )
-        xs = outs.hidden_states[-1]
+        ) # outs['logits'].shape=[1, 154, 151936], len(outs['past_key_values'])=24, len(outs['hidden_states'])=25
+        xs = outs.hidden_states[-1] # [1, 154, 896]
         new_cache = outs.past_key_values
         return xs, new_cache
 
@@ -303,6 +303,7 @@ class Qwen2LM(TransformerLM):
         self.vllm_output_queue = {}
 
     def prepare_lm_input_target(self, text_token, text_token_emb, text_token_len, speech_token, speech_token_emb, speech_token_len):
+        import ipdb; ipdb.set_trace()
         lm_target, lm_input = [], []
         text_token = unpad_sequence(text_token, text_token_len.cpu(), batch_first=True)
         speech_token = unpad_sequence(speech_token, speech_token_len.cpu(), batch_first=True)
@@ -356,6 +357,7 @@ class Qwen2LM(TransformerLM):
             audio: (B, T, N) or (B, T)
             audio_lengths: (B,)
         """
+        import ipdb; ipdb.set_trace()
         text_token = batch['text_token'].to(device)
         text_token_len = batch['text_token_len'].to(device)
         speech_token = batch['speech_token'].to(device)
@@ -383,6 +385,7 @@ class Qwen2LM(TransformerLM):
             batch: dict,
             device: torch.device,
     ) -> Dict[str, Optional[torch.Tensor]]:
+        import ipdb; ipdb.set_trace()
         text_token = batch['text_token'].to(device)
         text_token_len = batch['text_token_len'].to(device)
         speech_token = batch['speech_token'].to(device)
@@ -440,30 +443,32 @@ class Qwen2LM(TransformerLM):
             min_token_text_ratio: float = 2,
             uuid: str = '',
     ) -> Generator[torch.Tensor, None, None]:
+        import ipdb; ipdb.set_trace()
         device = text.device
-        text = torch.concat([prompt_text, text], dim=1)
-        text_len += prompt_text_len
-        text = self.llm.model.model.embed_tokens(text)
-
+        text = torch.concat([prompt_text, text], dim=1) # [1, 15] + [1, 50] -> [1, 65] 参考文本+待tts的文本
+        text_len += prompt_text_len # value=[65]
+        text = self.llm.model.model.embed_tokens(text) # 就是搞一下text token embedding
+        #      Qwen2LM, Qwen2Encoder, Qwen2ForCausalLM(in transformers), Qwen2Model(in transformers), ->   (embed_tokens): Embedding(151936, 896) -> [1, 65] to [1, 65, 896]
         # 3. concat llm_input
-        sos_eos_emb = self.llm_embedding.weight[self.sos_eos].reshape(1, 1, -1)
-        task_id_emb = self.llm_embedding.weight[self.task_id].reshape(1, 1, -1)
+        sos_eos_emb = self.llm_embedding.weight[self.sos_eos].reshape(1, 1, -1) # (2, 896) -> [0] -> [1, 1, 896]; S
+        task_id_emb = self.llm_embedding.weight[self.task_id].reshape(1, 1, -1) # (2, 896) -> [1] -> [1, 1, 896]; T
         if prompt_speech_token_len != 0:
             prompt_speech_token_emb = self.speech_embedding(prompt_speech_token)
         else:
             prompt_speech_token_emb = torch.zeros(1, 0, self.llm_input_size, dtype=text.dtype).to(device)
-        lm_input = torch.concat([sos_eos_emb, text, task_id_emb, prompt_speech_token_emb], dim=1)
+        lm_input = torch.concat([sos_eos_emb, text, task_id_emb, prompt_speech_token_emb], dim=1) # [1, 1+65+1+87, 896] -> [1, 154, 896] NOTE 这是构造好了输入: S [prompt_text text] T prompt_speech_token
 
         # 4. cal min/max_length
-        min_len = int((text_len - prompt_text_len) * min_token_text_ratio)
-        max_len = int((text_len - prompt_text_len) * max_token_text_ratio)
+        min_len = int((text_len - prompt_text_len) * min_token_text_ratio) # 100
+        max_len = int((text_len - prompt_text_len) * max_token_text_ratio) # 1000
 
-        # 5. step by step decode
+        # 5. step by step decode NOTE
         for token in self.inference_wrapper(lm_input, sampling, min_len, max_len, uuid):
             yield token
 
     @torch.inference_mode()
-    def inference_wrapper(self, lm_input, sampling, min_len, max_len, uuid):
+    def inference_wrapper(self, lm_input, sampling, min_len, max_len, uuid): # lm_input.shape=[1, 154, 896], sampling=25, min_len=100, max_len=1000, uuid='9cacceaa-8cb4-11f0-9783-0242ac110005'
+        import ipdb; ipdb.set_trace()
         if hasattr(self, 'vllm'):
             from vllm import SamplingParams, RequestOutput
             sampling_params = SamplingParams(top_k=sampling,
@@ -494,22 +499,22 @@ class Qwen2LM(TransformerLM):
             with self.lock:
                 self.vllm_output_queue.pop(uuid)
         else:
-            out_tokens = []
+            out_tokens = [] # NOTE here
             cache = None
-            for i in range(max_len):
-                y_pred, cache = self.llm.forward_one_step(lm_input,
-                                                          masks=torch.tril(torch.ones((1, lm_input.shape[1], lm_input.shape[1]), device=lm_input.device)).to(torch.bool),
-                                                          cache=cache)
-                logp = self.llm_decoder(y_pred[:, -1]).log_softmax(dim=-1)
+            for i in range(max_len): # 1000
+                y_pred, cache = self.llm.forward_one_step(lm_input, # [1, 1+65+1+87, 896]
+                                                          masks=torch.tril(torch.ones((1, lm_input.shape[1], lm_input.shape[1]), device=lm_input.device)).to(torch.bool), # 对角线和左下都是1，其他地方都是0
+                                                          cache=cache) # y_pred.shape=[1, 154, 896] only the [1, -1, 896] matters for next one (speech) token prediction
+                logp = self.llm_decoder(y_pred[:, -1]).log_softmax(dim=-1) # [1, 896] -> Linear(896, 6564) -> [1, 6564] -> log and softmax -> [1, 6564]=logp
                 top_ids = self.sampling_ids(logp.squeeze(dim=0), out_tokens, sampling, ignore_eos=True if i < min_len else False).item()
-                if top_ids == self.speech_token_size:
+                if top_ids == self.speech_token_size: # 3975 != 6561
                     break
                 if top_ids > self.speech_token_size:
                     continue
                 # in stream mode, yield token one by one
                 yield top_ids
                 out_tokens.append(top_ids)
-                lm_input = self.speech_embedding.weight[top_ids].reshape(1, 1, -1)
+                lm_input = self.speech_embedding.weight[top_ids].reshape(1, 1, -1) # [1, 1, 896] 啊！这里不带历史了吗？？？ 下一轮循环，只是输入一个token吗？
 
     @torch.inference_mode()
     def inference_bistream(
@@ -524,7 +529,7 @@ class Qwen2LM(TransformerLM):
             max_token_text_ratio: float = 20,
             min_token_text_ratio: float = 2,
     ) -> Generator[torch.Tensor, None, None]:
-
+        import ipdb; ipdb.set_trace()
         device = prompt_text.device
         # 1. prepare input
         sos_eos_emb = self.llm_embedding.weight[self.sos_eos].reshape(1, 1, -1)
@@ -610,3 +615,4 @@ class Qwen2LM(TransformerLM):
             # in stream mode, yield token one by one
             yield top_ids
             lm_input = self.speech_embedding.weight[top_ids].reshape(1, 1, -1)
+

@@ -172,30 +172,30 @@ class UpsampleConformerEncoder(torch.nn.Module):
             input_size, # 512
             output_size, # 512
             dropout_rate, # 0.1
-            COSYVOICE_EMB_CLASSES[pos_enc_layer_type](output_size,
-                                                      positional_dropout_rate),
-        )
+            COSYVOICE_EMB_CLASSES[pos_enc_layer_type](output_size, # 512
+                                                      positional_dropout_rate), # 0.1
+        ) # pos_enc_layer_type='rel_pos_espnet', 
 
-        self.normalize_before = normalize_before
+        self.normalize_before = normalize_before # True
         self.after_norm = torch.nn.LayerNorm(output_size, eps=1e-5)
-        self.static_chunk_size = static_chunk_size
-        self.use_dynamic_chunk = use_dynamic_chunk
-        self.use_dynamic_left_chunk = use_dynamic_left_chunk
-        self.gradient_checkpointing = gradient_checkpointing
-        activation = COSYVOICE_ACTIVATION_CLASSES[activation_type]()
+        self.static_chunk_size = static_chunk_size # 25
+        self.use_dynamic_chunk = use_dynamic_chunk # false
+        self.use_dynamic_left_chunk = use_dynamic_left_chunk # false
+        self.gradient_checkpointing = gradient_checkpointing # false
+        activation = COSYVOICE_ACTIVATION_CLASSES[activation_type]() # SiLU()
         # self-attention module definition
         encoder_selfattn_layer_args = (
-            attention_heads,
-            output_size,
-            attention_dropout_rate,
-            key_bias,
+            attention_heads, # 8
+            output_size, # 512
+            attention_dropout_rate, # 0.1
+            key_bias, # True
         )
         # feed-forward module definition
         positionwise_layer_args = (
-            output_size,
-            linear_units,
-            dropout_rate,
-            activation,
+            output_size, # 512
+            linear_units, # 2048
+            dropout_rate, # 0.1
+            activation, # SiLU()
         )
         # convolution module definition
         convolution_layer_args = (output_size, cnn_module_kernel, activation,
@@ -204,16 +204,16 @@ class UpsampleConformerEncoder(torch.nn.Module):
         self.encoders = torch.nn.ModuleList([
             ConformerEncoderLayer(
                 output_size,
-                COSYVOICE_ATTENTION_CLASSES[selfattention_layer_type](
+                COSYVOICE_ATTENTION_CLASSES[selfattention_layer_type]( # 'rel_selfattn'
                     *encoder_selfattn_layer_args),
                 PositionwiseFeedForward(*positionwise_layer_args),
                 PositionwiseFeedForward(
-                    *positionwise_layer_args) if macaron_style else None,
+                    *positionwise_layer_args) if macaron_style else None, # macaron_style=false, TODO why not two FFN?
                 ConvolutionModule(
-                    *convolution_layer_args) if use_cnn_module else None,
+                    *convolution_layer_args) if use_cnn_module else None, # use_cnn_module=false
                 dropout_rate,
                 normalize_before,
-            ) for _ in range(num_blocks)
+            ) for _ in range(num_blocks) # 6
         ])
         self.up_layer = Upsample1D(channels=512, out_channels=512, stride=2)
         self.up_embed = COSYVOICE_SUBSAMPLE_CLASSES[input_layer](
@@ -273,6 +273,7 @@ class UpsampleConformerEncoder(torch.nn.Module):
             checkpointing API because `__call__` attaches all the hooks of the module.
             https://discuss.pytorch.org/t/any-different-between-model-input-and-model-forward-input/3690/2
         """
+        import ipdb; ipdb.set_trace()
         T = xs.size(1)
         masks = ~make_pad_mask(xs_lens, T).unsqueeze(1)  # (B, 1, T)
         if self.global_cmvn is not None:
