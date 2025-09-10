@@ -33,7 +33,7 @@ instruct_dict = {'预训练音色': '1. 选择预训练音色\n2. 点击生成�
                  '自然语言控制': '1. 选择预训练音色\n2. 输入instruct文本\n3. 点击生成音频按钮'}
 stream_mode_list = [('否', False), ('是', True)]
 max_val = 0.8
-
+# webui = Web UI
 
 def generate_seed():
     seed = random.randint(1, 100000000)

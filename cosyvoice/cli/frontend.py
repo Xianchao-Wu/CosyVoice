@@ -46,28 +46,28 @@ class CosyVoiceFrontEnd:
                  spk2info: str = '',
                  allowed_special: str = 'all'):
         import ipdb; ipdb.set_trace()
-        self.tokenizer = get_tokenizer()
-        self.feat_extractor = feat_extractor
+        self.tokenizer = get_tokenizer() # <cosyvoice.tokenizer.tokenizer.QwenTokenizer object at 0x7f4ef2eb32b0> 文本text tokenizer
+        self.feat_extractor = feat_extractor # functools.partial(<function mel_spectrogram at 0x7f4e97d01990>, n_fft=1920, num_mels=80, sampling_rate=24000, hop_size=480, win_size=1920, fmin=0, fmax=8000, center=False) # 抽取一个语音的梅尔谱，例如[1, 83589] -> [1, 174, 80]
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         option = onnxruntime.SessionOptions()
         option.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
         option.intra_op_num_threads = 1
-        self.campplus_session = onnxruntime.InferenceSession(campplus_model, sess_options=option, providers=["CPUExecutionProvider"]) # campplus = Content-Aware Multi-scale Pitch ++ 是cosyvoice团队在tts里面用来做 音色建模+音高/韵律特征提取 的模块. NOTE
+        self.campplus_session = onnxruntime.InferenceSession(campplus_model, sess_options=option, providers=["CPUExecutionProvider"]) # campplus = Content-Aware Multi-scale Pitch ++ 是cosyvoice团队在tts里面用来做 音色建模+音高/韵律特征提取 的模块. NOTE 'pretrained_models/CosyVoice2-0.5B/campplus.onnx'=campplus_model ''' 根据一段ref参考语音，抽取speaker embedding vector, e.g., [1,55726] -> [1,192]'''
         self.speech_tokenizer_session = onnxruntime.InferenceSession(speech_tokenizer_model, sess_options=option,
                                                                      providers=["CUDAExecutionProvider" if torch.cuda.is_available() else
-                                                                                "CPUExecutionProvider"])
+                                                                                "CPUExecutionProvider"]) # speech_tokenizer_model='pretrained_models/CosyVoice2-0.5B/speech_tokenizer_v2.onnx'
         if os.path.exists(spk2info): # pretrained_models/CosyVoice2-0.5B/spk2info.pt
             self.spk2info = torch.load(spk2info, map_location=self.device)
         else:
             self.spk2info = {}
-        self.allowed_special = allowed_special
-        self.use_ttsfrd = use_ttsfrd
+        self.allowed_special = allowed_special # 'all' -> all special symbols are allowed to use
+        self.use_ttsfrd = use_ttsfrd # True, 'frd' = frontend
         if self.use_ttsfrd:
             self.frd = ttsfrd.TtsFrontendEngine() # <module 'ttsfrd' from '/usr/local/lib/python3.10/dist-packages/ttsfrd.cpython-310-x86_64-linux-gnu.so'>
             ROOT_DIR = os.path.dirname(os.path.abspath(__file__)) # '/workspace/asr/CosyVoice/cosyvoice/cli'
             assert self.frd.initialize('{}/../../pretrained_models/CosyVoice-ttsfrd/resource'.format(ROOT_DIR)) is True, \
                 'failed to initialize ttsfrd resource'
-            self.frd.set_lang_type('pinyinvg') # TODO what is vg? pinyin-vg?
+            self.frd.set_lang_type('pinyinvg') # self.frd=<class 'ttsfrd.TtsFrontendEngine'>, TODO what is vg? pinyin-vg?
         else:
             self.zh_tn_model = ZhNormalizer(remove_erhua=False)
             self.en_tn_model = EnNormalizer()
@@ -125,7 +125,9 @@ class CosyVoiceFrontEnd:
         speech_feat_len = torch.tensor([speech_feat.shape[1]], dtype=torch.int32).to(self.device) # tensor([174], device='cuda:0', dtype=torch.int32)
         return speech_feat, speech_feat_len
         # speech_feat.shape=[1, 174, 80], speech_feat_len=174
+
     def text_normalize(self, text, split=True, text_frontend=True):
+        import ipdb; ipdb.set_trace()
         if isinstance(text, Generator):
             logging.info('get tts_text generator, will skip text_normalize!')
             return [text]
@@ -180,7 +182,7 @@ class CosyVoiceFrontEnd:
                            'prompt_speech_feat': speech_feat, 'prompt_speech_feat_len': speech_feat_len,
                            'llm_embedding': embedding, 'flow_embedding': embedding}
         else:
-            model_input = self.spk2info[zero_shot_spk_id]
+            model_input = self.spk2info[zero_shot_spk_id] # NOTE 这是复用了ref text/ref voice/ref speaker embedding相关的10个信息了！
         model_input['text'] = tts_text_token # '收到好友从远方寄来的生日礼物，那份意外的惊喜与深深的祝福让我心中充满了甜蜜的快乐，笑容如花儿般绽放。' -> text tokenizer -> [1,50]
         model_input['text_len'] = tts_text_token_len # tensor([50], device='cuda:0', dtype=torch.int32)
         return model_input

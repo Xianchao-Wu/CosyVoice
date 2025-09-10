@@ -252,9 +252,9 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
         embedding = self.spk_embed_affine_layer(embedding) # [1,192] -> Linear(192, 80) -> [1,80]
 
         # concat text and prompt_text
-        token, token_len = torch.concat([prompt_token, token], dim=1), prompt_token_len + token_len
+        token, token_len = torch.concat([prompt_token, token], dim=1), prompt_token_len + token_len # [1, 87] + [1, 311] -> [1, 398]
         mask = (~make_pad_mask(token_len)).unsqueeze(-1).to(embedding)
-        token = self.input_embedding(torch.clamp(token, min=0)) * mask # [1,398] -> Embedding(6561, 512) -> [1, 398, 512]
+        token = self.input_embedding(torch.clamp(token, min=0)) * mask # [1,398] -> Embedding(6561, 512) -> [1, 398, 512], prompt_len + text_len = 87 + 311 = 398
 
         # text encode
         if finalize is True:
@@ -278,7 +278,7 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
             cond=conds, # [1, 80, 796]
             n_timesteps=10,
             streaming=streaming # False
-        ) # NOTE CausalConditionalCFM feat.shape=[1, 80, 796]
+        ) # NOTE CausalConditionalCFM feat.shape=[1, 80, 796] # NOTE 只有这里是按照时间循环了10次的！
         feat = feat[:, :, mel_len1:] # [1, 80, 622] ? NOTE 难道说，这是622个位置的梅尔谱，一次成型了？？？ 只需要十次loop (t=0 to 1 with [0, ..., 1] totally 11 timepoints) -> 是的，是一次成型了!
         assert feat.shape[2] == mel_len2
         return feat.float(), None # [1, 80, 622]

@@ -253,7 +253,7 @@ class Qwen2Encoder(torch.nn.Module):
             return_dict=True,
             use_cache=True,
             past_key_values=cache,
-        ) # outs['logits'].shape=[1, 154, 151936], len(outs['past_key_values'])=24, len(outs['hidden_states'])=25
+        ) # outs['logits'].shape=[1, 154, 151936], len(outs['past_key_values'])=24, len(outs['hidden_states'])=25 NOTE
         xs = outs.hidden_states[-1] # [1, 154, 896]
         new_cache = outs.past_key_values
         return xs, new_cache
@@ -453,7 +453,7 @@ class Qwen2LM(TransformerLM):
         sos_eos_emb = self.llm_embedding.weight[self.sos_eos].reshape(1, 1, -1) # (2, 896) -> [0] -> [1, 1, 896]; S
         task_id_emb = self.llm_embedding.weight[self.task_id].reshape(1, 1, -1) # (2, 896) -> [1] -> [1, 1, 896]; T
         if prompt_speech_token_len != 0:
-            prompt_speech_token_emb = self.speech_embedding(prompt_speech_token)
+            prompt_speech_token_emb = self.speech_embedding(prompt_speech_token) # (1, 87) -> Embedding(6564, 896) -> (1, 87, 896) 这是对ref speech token seq进行embedding 
         else:
             prompt_speech_token_emb = torch.zeros(1, 0, self.llm_input_size, dtype=text.dtype).to(device)
         lm_input = torch.concat([sos_eos_emb, text, task_id_emb, prompt_speech_token_emb], dim=1) # [1, 1+65+1+87, 896] -> [1, 154, 896] NOTE 这是构造好了输入: S [prompt_text text] T prompt_speech_token
@@ -499,14 +499,14 @@ class Qwen2LM(TransformerLM):
             with self.lock:
                 self.vllm_output_queue.pop(uuid)
         else:
-            out_tokens = [] # NOTE here
+            out_tokens = [] # here
             cache = None
             for i in range(max_len): # 1000
                 y_pred, cache = self.llm.forward_one_step(lm_input, # [1, 1+65+1+87, 896]
                                                           masks=torch.tril(torch.ones((1, lm_input.shape[1], lm_input.shape[1]), device=lm_input.device)).to(torch.bool), # 对角线和左下都是1，其他地方都是0
-                                                          cache=cache) # y_pred.shape=[1, 154, 896] only the [1, -1, 896] matters for next one (speech) token prediction
+                                                          cache=cache) # NOTE y_pred.shape=[1, 154, 896] only the [1, -1, 896] matters for next one (speech) token prediction, 自回归的方式，来预测下一个speech token
                 logp = self.llm_decoder(y_pred[:, -1]).log_softmax(dim=-1) # [1, 896] -> Linear(896, 6564) -> [1, 6564] -> log and softmax -> [1, 6564]=logp
-                top_ids = self.sampling_ids(logp.squeeze(dim=0), out_tokens, sampling, ignore_eos=True if i < min_len else False).item()
+                top_ids = self.sampling_ids(logp.squeeze(dim=0), out_tokens, sampling, ignore_eos=True if i < min_len else False).item() # 进行一次采样
                 if top_ids == self.speech_token_size: # 3975 != 6561
                     break
                 if top_ids > self.speech_token_size:
@@ -514,7 +514,7 @@ class Qwen2LM(TransformerLM):
                 # in stream mode, yield token one by one
                 yield top_ids
                 out_tokens.append(top_ids)
-                lm_input = self.speech_embedding.weight[top_ids].reshape(1, 1, -1) # [1, 1, 896] 啊！这里不带历史了吗？？？ 下一轮循环，只是输入一个token吗？
+                lm_input = self.speech_embedding.weight[top_ids].reshape(1, 1, -1) # [1, 1, 896] 啊！这里不带历史了吗？？？ 下一轮循环，只是输入一个token吗？ NOTE 把历史带上的是依靠kv cache! 没有问题了
 
     @torch.inference_mode()
     def inference_bistream(

@@ -167,7 +167,7 @@ class UpsampleConformerEncoder(torch.nn.Module):
         super().__init__()
         self._output_size = output_size # 512
 
-        self.global_cmvn = global_cmvn
+        self.global_cmvn = global_cmvn # none
         self.embed = COSYVOICE_SUBSAMPLE_CLASSES[input_layer](
             input_size, # 512
             output_size, # 512

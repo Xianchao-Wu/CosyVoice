@@ -121,7 +121,7 @@ class CosyVoiceModel:
                                             prompt_speech_token_len=torch.tensor([llm_prompt_speech_token.shape[1]], dtype=torch.int32).to(self.device),
                                             embedding=llm_embedding.to(self.device),
                                             uuid=uuid):
-                    self.tts_speech_token_dict[uuid].append(i) # NOTE 保存预测出来的speech tokens
+                    self.tts_speech_token_dict[uuid].append(i) # NOTE 保存预测出来的speech token, 一个循环，只生成一个新的speech token!  only ONE
         self.llm_end_dict[uuid] = True
 
     def vc_job(self, source_speech_token, uuid):
@@ -249,9 +249,9 @@ class CosyVoice2Model(CosyVoiceModel):
                  fp16: bool = False):
         import ipdb; ipdb.set_trace()
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.llm = llm
-        self.flow = flow
-        self.hift = hift
+        self.llm = llm # 24 Qwen2DecoderLayer, 505,803,812 (0.5B=505.8M)
+        self.flow = flow # 112,549,360 (112M), flow.encoder with 6 ConformerEncoderLayer 37831168 of 33.6%; flow.decoder with 1 down block, 12 mid blocks and 1 up block and 1 final block 71302480 of 63.4%
+        self.hift = hift # 20,821,295 (20M), HiFTGenerator
         self.fp16 = fp16
         if self.fp16 is True:
             self.llm.half()
@@ -282,7 +282,7 @@ class CosyVoice2Model(CosyVoiceModel):
                                  skip_tokenizer_init=True,
                                  enable_prompt_embeds=True,
                                  gpu_memory_utilization=0.2)
-        self.llm.vllm = LLMEngine.from_engine_args(engine_args)
+        self.llm.vllm = LLMEngine.from_engine_args(engine_args) # NOTE
         self.llm.lock = threading.Lock()
         del self.llm.llm.model.model.layers
 
@@ -335,8 +335,8 @@ class CosyVoice2Model(CosyVoiceModel):
             self.tts_speech_token_dict[this_uuid], self.llm_end_dict[this_uuid] = [], False
             self.hift_cache_dict[this_uuid] = None
         if source_speech_token.shape[1] == 0:
-            ###p = threading.Thread(target=self.llm_job, args=(text, prompt_text, llm_prompt_speech_token, llm_embedding, this_uuid)) # here NOTE 这就直接调用qwen2lm了！
-            self.llm_job(text, prompt_text, llm_prompt_speech_token, llm_embedding, this_uuid)
+            ###p = threading.Thread(target=self.llm_job, args=(text, prompt_text, llm_prompt_speech_token, llm_embedding, this_uuid)) # here NOTE 这就直接调用qwen2lm了！ TODO 这是我为了学习内部逻辑而做的
+            self.llm_job(text, prompt_text, llm_prompt_speech_token, llm_embedding, this_uuid) # NOTE NOTE NOTE -> 根据qwen2lm，自回归地生成speech token one-by-one
         else:
             ###p = threading.Thread(target=self.vc_job, args=(source_speech_token, this_uuid))
             self.vc_job(source_speech_token, this_uuid)
@@ -356,7 +356,7 @@ class CosyVoice2Model(CosyVoiceModel):
                                                      token_offset=token_offset,
                                                      uuid=this_uuid,
                                                      stream=stream,
-                                                     finalize=False)
+                                                     finalize=False) # NOTE NOTE NOTE from speech token seq -> flow matching -> mel spectrogram -> hifhgan's generator -> final wav, e.g., [1, 298560]
                     token_offset += this_token_hop_len
                     yield {'tts_speech': this_tts_speech.cpu()}
                 if self.llm_end_dict[this_uuid] is True and len(self.tts_speech_token_dict[this_uuid]) - token_offset < this_token_hop_len + self.flow.pre_lookahead_len:
