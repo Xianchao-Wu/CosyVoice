@@ -226,7 +226,7 @@ data_pipeline_gan: [
     !ref <padding>,
 ]
 
-# llm flow train conf
+# 'llm' and 'flow' 's train conf
 train_conf:
     optim: adam
     optim_conf:
@@ -240,7 +240,7 @@ train_conf:
     log_interval: 100
     save_per_step: -1
 
-# gan train conf
+# 'gan' 's train conf
 train_conf_gan:
     optim: adam
     optim_conf:

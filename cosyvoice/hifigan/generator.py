@@ -556,16 +556,17 @@ class HiFTGenerator(nn.Module):
             batch: dict,
             device: torch.device,
     ) -> Dict[str, Optional[torch.Tensor]]:
-        speech_feat = batch['speech_feat'].transpose(1, 2).to(device)
-        # mel->f0
-        f0 = self.f0_predictor(speech_feat)
+        import ipdb; ipdb.set_trace() # for training NOTE
+        speech_feat = batch['speech_feat'].transpose(1, 2).to(device) # [20, 80, 96]
+        # mel->f0 从梅尔谱到f0
+        f0 = self.f0_predictor(speech_feat) # [20, 80, 96] -> ConvRNNF0Predictor -> [20, 96]
         # f0->source
-        s = self.f0_upsamp(f0[:, None]).transpose(1, 2)  # bs,n,t
-        s, _, _ = self.m_source(s)
-        s = s.transpose(1, 2)
+        s = self.f0_upsamp(f0[:, None]).transpose(1, 2)  # bs,n,t; Upsample(scale_factor=256.0, mode='nearest'), s.shape=[20, 24576, 1], 96*scale_factor=96*256=24576
+        s, _, _ = self.m_source(s) # s= -> SourceModuleHnNSF( -> [20, 24576, 1]
+        s = s.transpose(1, 2) # [20, 1, 24576]
         # mel+source->speech
-        generated_speech = self.decode(x=speech_feat, s=s)
-        return generated_speech, f0
+        generated_speech = self.decode(x=speech_feat, s=s) # <bound method HiFTGenerator.decode of HiFTGenerator( -> [20, 24576]
+        return generated_speech, f0 # [20, 24576] and [20, 96]
 
     @torch.inference_mode()
     def inference(self, speech_feat: torch.Tensor, cache_source: torch.Tensor = torch.zeros(1, 1, 0)) -> torch.Tensor: # speech_feat.shape=[1,80,622], 

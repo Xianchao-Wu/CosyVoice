@@ -144,8 +144,10 @@ def init_optimizer_and_scheduler(args, configs, model, gan):
 
     else:
         # currently we wrap generator and discriminator in one model, so we cannot use deepspeed
+        import ipdb; ipdb.set_trace()
         if configs['train_conf']['optim'] == 'adam':
-            optimizer = optim.Adam(model.module.generator.parameters(), **configs['train_conf']['optim_conf'])
+            ###optimizer = optim.Adam(model.module.generator.parameters(), **configs['train_conf']['optim_conf']) # TODO
+            optimizer = optim.Adam(model.generator.parameters(), **configs['train_conf']['optim_conf'])
         elif configs['train_conf']['optim'] == 'adamw':
             optimizer = optim.AdamW(model.module.generator.parameters(), **configs['train_conf']['optim_conf'])
         else:
@@ -164,7 +166,8 @@ def init_optimizer_and_scheduler(args, configs, model, gan):
             raise ValueError("unknown scheduler: " + configs['train_conf'])
 
         if configs['train_conf']['optim_d'] == 'adam':
-            optimizer_d = optim.Adam(model.module.discriminator.parameters(), **configs['train_conf']['optim_conf'])
+            ###optimizer_d = optim.Adam(model.module.discriminator.parameters(), **configs['train_conf']['optim_conf']) # TODO
+            optimizer_d = optim.Adam(model.discriminator.parameters(), **configs['train_conf']['optim_conf'])
         elif configs['train_conf']['optim_d'] == 'adamw':
             optimizer_d = optim.AdamW(model.module.discriminator.parameters(), **configs['train_conf']['optim_conf'])
         else:
@@ -254,7 +257,7 @@ def batch_forward(model, batch, scaler, info_dict, ref_model=None, dpo_loss=None
         autocast = torch.cuda.amp.autocast(enabled=True, dtype=dtype, cache_enabled=False)
 
     with autocast:
-        info_dict['loss_dict'] = model(batch, device) # NOTE {'loss': tensor(3.2007, device='cuda:0', grad_fn=<DivBackward0>), 'acc': tensor(0.2478, device='cuda:0')} ||| <class 'cosyvoice.flow.flow.MaskedDiffWithXvec'>
+        info_dict['loss_dict'] = model(batch, device) # NOTE {'loss': tensor(3.2007, device='cuda:0', grad_fn=<DivBackward0>), 'acc': tensor(0.2478, device='cuda:0')} ||| <class 'cosyvoice.flow.flow.MaskedDiffWithXvec'> ||| 'gan': <class 'cosyvoice.hifigan.hifigan.HiFiGan'>, <class 'cosyvoice.hifigan.hifigan.HiFiGan'> 
         if ref_model is not None and dpo_loss is not None:
             chosen_logps = info_dict['loss_dict']["chosen_logps"]
             rejected_logps = info_dict['loss_dict']["rejected_logps"]
@@ -273,7 +276,11 @@ def batch_forward(model, batch, scaler, info_dict, ref_model=None, dpo_loss=None
             info_dict['loss_dict']["dpo_acc"] = dpo_acc
             info_dict['loss_dict']["chosen_reward"] = chosen_reward.mean()
             info_dict['loss_dict']["reject_reward"] = reject_reward.mean()
-    return info_dict # {'optim': 'adam', 'optim_conf': {'lr': 0.001}, 'scheduler': 'warmuplr', 'scheduler_conf': {'warmup_steps': 2500}, 'max_epoch': 200, 'grad_clip': 5, 'accum_grad': 2, 'log_interval': 100, 'save_per_step': -1, 'train_engine': 'torch_ddp', 'model': 'llm', 'ref_model': None, 'config': 'conf/cosyvoice.yaml', 'train_data': 'data/train.data.list', 'cv_data': 'data/dev.data.list', 'qwen_pretrain_path': None, 'checkpoint': '../../../pretrained_models/CosyVoice-300M/llm.pt', 'model_dir': '/workspace/asr/CosyVoice/examples/libritts/cosyvoice/exp/cosyvoice/llm/torch_ddp', 'tensorboard_dir': '/workspace/asr/CosyVoice/examples/libritts/cosyvoice/tensorboard/cosyvoice/llm/torch_ddp', 'dist_backend': 'nccl', 'num_workers': 2, 'prefetch': 100, 'pin_memory': True, 'use_amp': True, 'dpo': False, 'save_states': 'model+optimizer', 'timeout': 60, 'deepspeed': False, 'deepspeed_config': './conf/ds_stage2.json', 'deepscale': False, 'deepscale_config': None, 'dtype': 'bf16', 'step': 0, 'epoch': 0, 'save_time': '12/09/2025 08:19:32', 'tag': 'TRAIN', 'batch_idx': 0, 'loss_dict': {'loss': tensor(3.2007, device='cuda:0', grad_fn=<DivBackward0>), 'acc': tensor(0.2478, device='cuda:0')}}
+    return info_dict # {'optim': 'adam', 'optim_conf': {'lr': 0.001}, 'scheduler': 'warmuplr', 'scheduler_conf': {'warmup_steps': 2500}, 'max_epoch': 200, 'grad_clip': 5, 'accum_grad': 2, 'log_interval': 100, 'save_per_step': -1, 'train_engine': 'torch_ddp', 'model': 'llm', 'ref_model': None, 'config': 'conf/cosyvoice.yaml', 'train_data': 'data/train.data.list', 'cv_data': 'data/dev.data.list', 'qwen_pretrain_path': None, 'checkpoint': '../../../pretrained_models/CosyVoice-300M/llm.pt', 'model_dir': '/workspace/asr/CosyVoice/examples/libritts/cosyvoice/exp/cosyvoice/llm/torch_ddp', 'tensorboard_dir': '/workspace/asr/CosyVoice/examples/libritts/cosyvoice/tensorboard/cosyvoice/llm/torch_ddp', 'dist_backend': 'nccl', 'num_workers': 2, 'prefetch': 100, 'pin_memory': True, 'use_amp': True, 'dpo': False, 'save_states': 'model+optimizer', 'timeout': 60, 'deepspeed': False, 'deepspeed_config': './conf/ds_stage2.json', 'deepscale': False, 'deepscale_config': None, 'dtype': 'bf16', 'step': 0, 'epoch': 0, 'save_time': '12/09/2025 08:19:32', 'tag': 'TRAIN', 'batch_idx': 0, 'loss_dict': {'loss': tensor(3.2007, device='cuda:0', grad_fn=<DivBackward0>), 'acc': tensor(0.2478, device='cuda:0')}} ||| {'optim': 'adam', 'optim_conf': {'lr': 0.0002}, 'scheduler': 'constantlr', 'optim_d': 'adam', 'optim_conf_d': {'lr': 0.0002}, 'scheduler_d': 'constantlr', 'max_epoch': 200, 'grad_clip': 5, 'accum_grad': 1, 'log_interval': 100, 'save_per_step': -1, 'train_engine': 'torch_ddp', 'model': 'hifigan', 'ref_model': None, 'config': 'conf/cosyvoice.yaml', 'train_data': 'data/train.data.list', 'cv_data': 'data/dev.data.list', 'qwen_pretrain_path': None, 'checkpoint': '../../../pretrained_models/CosyVoice-300M/hifigan.pt', 'model_dir': '/workspace/asr/CosyVoice/examples/libritts/cosyvoice/exp/cosyvoice/hifigan/torch_ddp', 'tensorboard_dir': '/workspace/asr/CosyVoice/examples/libritts/cosyvoice/tensorboard/cosyvoice/hifigan/torch_ddp', 'dist_backend': 'nccl', 'num_workers': 2, 'prefetch': 100, 'pin_memory': True, 'use_amp': True, 'dpo': False, 'save_states': 'model+optimizer', 'timeout': 60, 'deepspeed': False, 'deepspeed_config': './conf/ds_stage2.json', 'deepscale': False, 'deepscale_config': None, 'dtype': 'bf16', 'step': 0, 'epoch': 0, 'save_time': '13/09/2025 10:58:21', 'tag': 'TRAIN', 'batch_idx': 0, 'loss_dict': {'loss': tensor(7.7790, device='cuda:0', grad_fn=<AddBackward0>), 'loss_disc': tensor(7.7790, device='cuda:0', grad_fn=<AddBackward0>), 'loss_tpr': tensor(3.2887e-05, device='cuda:0', grad_fn=<AddBackward0>)}} for 'gan'
+    '''
+    # generator in hifigan
+    {'optim': 'adam', 'optim_conf': {'lr': 0.0002}, 'scheduler': 'constantlr', 'optim_d': 'adam', 'optim_conf_d': {'lr': 0.0002}, 'scheduler_d': 'constantlr', 'max_epoch': 200, 'grad_clip': 5, 'accum_grad': 1, 'log_interval': 100, 'save_per_step': -1, 'train_engine': 'torch_ddp', 'model': 'hifigan', 'ref_model': None, 'config': 'conf/cosyvoice.yaml', 'train_data': 'data/train.data.list', 'cv_data': 'data/dev.data.list', 'qwen_pretrain_path': None, 'checkpoint': '../../../pretrained_models/CosyVoice-300M/hifigan.pt', 'model_dir': '/workspace/asr/CosyVoice/examples/libritts/cosyvoice/exp/cosyvoice/hifigan/torch_ddp', 'tensorboard_dir': '/workspace/asr/CosyVoice/examples/libritts/cosyvoice/tensorboard/cosyvoice/hifigan/torch_ddp', 'dist_backend': 'nccl', 'num_workers': 2, 'prefetch': 100, 'pin_memory': True, 'use_amp': True, 'dpo': False, 'save_states': 'model+optimizer', 'timeout': 60, 'deepspeed': False, 'deepspeed_config': './conf/ds_stage2.json', 'deepscale': False, 'deepscale_config': None, 'dtype': 'bf16', 'step': 0, 'epoch': 0, 'save_time': '13/09/2025 10:58:21', 'tag': 'TRAIN', 'batch_idx': 0, 'loss_dict': {'loss': tensor(280.0538, device='cuda:0', dtype=torch.float64, grad_fn=<AddBackward0>), 'loss_gen': tensor(6.5214, device='cuda:0', grad_fn=<AddBackward0>), 'loss_fm': tensor(1.2734, device='cuda:0', dtype=torch.bfloat16, grad_fn=<MulBackward0>), 'loss_mel': tensor(1.8547, device='cuda:0', grad_fn=<AddBackward0>), 'loss_tpr': tensor(0.0008, device='cuda:0', grad_fn=<AddBackward0>), 'loss_f0': tensor(187.5213, device='cuda:0', dtype=torch.float64, grad_fn=<MeanBackward0>)}, 'lr': 0.0002, 'grad_norm': tensor(7.1313, device='cuda:0')}
+    '''
 
 
 def batch_backward(model, scaler, info_dict):

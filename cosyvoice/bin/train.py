@@ -190,11 +190,13 @@ def main():
         ###dist.barrier() # TODO
         #group_join = dist.new_group(backend="gloo", timeout=datetime.timedelta(seconds=args.timeout))
         if gan is True:
+            import ipdb; ipdb.set_trace()
             executor.train_one_epoc_gan(model, optimizer, scheduler, optimizer_d, scheduler_d, train_data_loader, cv_data_loader,
-                                        writer, info_dict, scaler, group_join)
+                                        writer, info_dict, scaler)
+            ###writer, info_dict, scaler, group_join) # TODO
         else:
             import ipdb; ipdb.set_trace()
-            ###executor.train_one_epoc(model, optimizer, scheduler, train_data_loader, cv_data_loader, writer, info_dict, scaler, group_join, ref_model=ref_model)
+            ###executor.train_one_epoc(model, optimizer, scheduler, train_data_loader, cv_data_loader, writer, info_dict, scaler, group_join, ref_model=ref_model) # TODO
             executor.train_one_epoc(model, optimizer, scheduler, train_data_loader, cv_data_loader, writer, info_dict, scaler, ref_model=ref_model)
         dist.destroy_process_group(group_join)
 

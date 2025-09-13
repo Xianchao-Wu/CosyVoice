@@ -206,6 +206,7 @@ def compute_f0(data, sample_rate, hop_size, mode='train'):
             _f0, t = pw.dio(waveform.squeeze(dim=0).numpy().astype('double'), sample_rate, frame_period=frame_period)  # if harvest fails, try dio
         f0 = pw.stonemask(waveform.squeeze(dim=0).numpy().astype('double'), _f0, t, sample_rate)
         f0 = F.interpolate(torch.from_numpy(f0).view(1, 1, -1), size=sample['speech_feat'].shape[0], mode='linear').view(-1)
+        #import ipdb; ipdb.set_trace()
         sample['pitch_feat'] = f0
         yield sample
 

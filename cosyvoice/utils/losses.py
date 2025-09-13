@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from typing import Tuple
 
-
+# tpr loss for Truncated Pointwise Relativistic (TPR) loss function, https://arxiv.org/pdf/2309.09493 Equation 11
 def tpr_loss(disc_real_outputs, disc_generated_outputs, tau):
     import ipdb; ipdb.set_trace()
     loss = 0
