@@ -2,14 +2,15 @@
 # Copyright 2024 Alibaba Inc. All Rights Reserved.
 . ./path.sh || exit 1;
 
-stage=-1
-stop_stage=-1 #3
+stage=0 #-1
+stop_stage=0 #-1 #3
 
 data_url=www.openslr.org/resources/60
 #data_dir=/mnt/lyuxiang.lx/data/tts/openslr/libritts
 data_dir="/workspace/asr/CosyVoice/data/tts/openslr/libritts"
 pretrained_model_dir=../../../pretrained_models/CosyVoice-300M
 
+# NOTE TODO 就是下载数据到本地，并且解压缩的
 if [ ${stage} -le -1 ] && [ ${stop_stage} -ge -1 ]; then
   echo "Data Download"
   for part in dev-clean test-clean dev-other test-other train-clean-100 train-clean-360 train-other-500; do
@@ -17,9 +18,11 @@ if [ ${stage} -le -1 ] && [ ${stop_stage} -ge -1 ]; then
   done
 fi
 
+# TODO here
 if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
   echo "Data preparation, prepare wav.scp/text/utt2spk/spk2utt"
-  for x in train-clean-100 train-clean-360 train-other-500 dev-clean dev-other test-clean test-other; do
+  #for x in dev-clean; do
+  for x in train-clean-100 train-clean-360 train-other-500 dev-other test-clean test-other; do
     mkdir -p data/$x
     python -m ipdb local/prepare_data.py --src_dir $data_dir/LibriTTS/$x --des_dir data/$x
   done

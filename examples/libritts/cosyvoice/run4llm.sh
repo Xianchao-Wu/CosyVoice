@@ -2,8 +2,8 @@
 # Copyright 2024 Alibaba Inc. All Rights Reserved.
 . ./path.sh || exit 1;
 
-stage=-1
-stop_stage=-1 #3
+stage=5 #-1
+stop_stage=5 #-1 
 
 data_url=www.openslr.org/resources/60
 #data_dir=/mnt/lyuxiang.lx/data/tts/openslr/libritts
@@ -19,7 +19,8 @@ fi
 
 if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
   echo "Data preparation, prepare wav.scp/text/utt2spk/spk2utt"
-  for x in train-clean-100 train-clean-360 train-other-500 dev-clean dev-other test-clean test-other; do
+  #for x in train-clean-100 train-clean-360 train-other-500 dev-clean dev-other test-clean test-other; do
+  for x in dev-clean; do
     mkdir -p data/$x
     python -m ipdb local/prepare_data.py --src_dir $data_dir/LibriTTS/$x --des_dir data/$x
   done
@@ -27,7 +28,8 @@ fi
 
 if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
   echo "Extract campplus speaker embedding, you will get spk2embedding.pt and utt2embedding.pt in data/$x dir"
-  for x in train-clean-100 train-clean-360 train-other-500 dev-clean dev-other test-clean test-other; do
+  #for x in train-clean-100 train-clean-360 train-other-500 dev-clean dev-other test-clean test-other; do
+  for x in dev-clean; do
     python -m ipdb tools/extract_embedding.py --dir data/$x \
       --onnx_path $pretrained_model_dir/campplus.onnx
   done
@@ -35,15 +37,18 @@ fi
 
 if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
   echo "Extract discrete speech token, you will get utt2speech_token.pt in data/$x dir"
-  for x in train-clean-100 train-clean-360 train-other-500 dev-clean dev-other test-clean test-other; do
-    python -m ipdb tools/extract_speech_token.py --dir data/$x \
+  #for x in dev-clean; do
+  for x in train-clean-100 train-clean-360 train-other-500 dev-other test-clean test-other; do
+    python tools/extract_speech_token.py --dir data/$x \
       --onnx_path $pretrained_model_dir/speech_tokenizer_v1.onnx
   done
 fi
 
+# TODO 这个就是准备后续的training所需要的parquet文件的集合
 if [ ${stage} -le 3 ] && [ ${stop_stage} -ge 3 ]; then
   echo "Prepare required parquet format data, you should have prepared wav.scp/text/utt2spk/spk2utt/utt2embedding.pt/spk2embedding.pt/utt2speech_token.pt"
-  for x in train-clean-100 train-clean-360 train-other-500 dev-clean dev-other test-clean test-other; do
+  #for x in train-clean-100 train-clean-360 train-other-500 dev-clean dev-other test-clean test-other; do
+  for x in dev-clean; do
     mkdir -p data/$x/parquet
     python -m ipdb tools/make_parquet_list.py --num_utts_per_parquet 1000 \
       --num_processes 10 \
@@ -66,17 +71,28 @@ if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
   if [ $train_engine == 'deepspeed' ]; then
     echo "Notice deepspeed has its own optimizer config. Modify conf/ds_stage2.json if necessary"
   fi
-  cat data/{train-clean-100,train-clean-360,train-other-500}/parquet/data.list > data/train.data.list
-  cat data/{dev-clean,dev-other}/parquet/data.list > data/dev.data.list
-  for model in llm flow hifigan; do
+
+  train_fn="data/train.data.list"
+  dev_fn="data/dev.data.list"
+
+  if [ ! -e $train_fn ]; then
+	cat data/{train-clean-100,train-clean-360,train-other-500}/parquet/data.list > $train_fn
+  fi
+
+  if [ ! -e $dev_fn ]; then
+	cat data/{dev-clean,dev-other}/parquet/data.list > $dev_fn
+  fi
+
+  #for model in llm flow hifigan; do
+  for model in llm; do
     #torchrun --nnodes=1 --nproc_per_node=$num_gpus \
     #    --rdzv_id=$job_id --rdzv_backend="c10d" --rdzv_endpoint="localhost:1234" \
 	# TODO 
     CUDA_VISIBLE_DEVICES=7 python -m ipdb cosyvoice/bin/train.py \
       --train_engine $train_engine \
       --config conf/cosyvoice.yaml \
-      --train_data data/train.data.list \
-      --cv_data data/dev.data.list \
+      --train_data $train_fn \
+      --cv_data $dev_fn \
       --model $model \
       --checkpoint $pretrained_model_dir/$model.pt \
       --model_dir `pwd`/exp/cosyvoice/$model/$train_engine \

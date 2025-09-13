@@ -110,8 +110,8 @@ class BaseEncoder(torch.nn.Module):
 
     def forward(
         self,
-        xs: torch.Tensor,
-        xs_lens: torch.Tensor,
+        xs: torch.Tensor, # [22, 59, 1024] 'llm' ||| [20, 56, 512] 'flow'
+        xs_lens: torch.Tensor, # [22]
         decoding_chunk_size: int = 0,
         num_decoding_left_chunks: int = -1,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -137,7 +137,7 @@ class BaseEncoder(torch.nn.Module):
             We pass the `__call__` method of the modules instead of `forward` to the
             checkpointing API because `__call__` attaches all the hooks of the module.
             https://discuss.pytorch.org/t/any-different-between-model-input-and-model-forward-input/3690/2
-        """
+        """ # NOTE used in model training
         T = xs.size(1)
         masks = ~make_pad_mask(xs_lens, T).unsqueeze(1)  # (B, 1, T)
         if self.global_cmvn is not None:
@@ -160,8 +160,8 @@ class BaseEncoder(torch.nn.Module):
         # Here we assume the mask is not changed in encoder layers, so just
         # return the masks before encoder layers, and the masks will be used
         # for cross attention with decoder later
-        return xs, masks
-
+        return xs, masks # xs.shape=[22, 59, 1024]; masks.shape=[22, 1, 59] with False for padded id NOTE for 'llm'
+        # xs.shape=[20, 56, 512]; masks.shape=[20, 1, 56] for 'flow' NOTE
     def forward_layers(self, xs: torch.Tensor, chunk_masks: torch.Tensor,
                        pos_emb: torch.Tensor,
                        mask_pad: torch.Tensor) -> torch.Tensor:

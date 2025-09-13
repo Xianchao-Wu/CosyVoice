@@ -36,7 +36,7 @@ def single_job(utt):
     else:
         feat = whisper.log_mel_spectrogram(audio, n_mels=128)
         speech_token = ort_session.run(None, {ort_session.get_inputs()[0].name: feat.detach().cpu().numpy(),
-                                              ort_session.get_inputs()[1].name: np.array([feat.shape[2]], dtype=np.int32)})[0].flatten().tolist()
+                                              ort_session.get_inputs()[1].name: np.array([feat.shape[2]], dtype=np.int32)})[0].flatten().tolist() # NOTE call existing onnx model
     return utt, speech_token
 
 
@@ -45,14 +45,14 @@ def main(args):
     utt2speech_token = {}
     for future in tqdm(as_completed(all_task)):
         utt, speech_token = future.result()
-        utt2speech_token[utt] = speech_token
+        utt2speech_token[utt] = speech_token # '6313_66125_000073_000001' -> [523, 695, 695, 232, 340, 647, 507, 3480, 202, 3539, 64, 387, 596, 584, 618, 515, 515, 287, 371, 511, 80, 181, 649, 649, 1460, 2644, 57, 630, 630, 399, 399, 184, 184, 184, 481, 1065, 584, 12, 412, 292, 237, 503] with 42 tokens
     torch.save(utt2speech_token, '{}/utt2speech_token.pt'.format(args.dir))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir", type=str)
-    parser.add_argument("--onnx_path", type=str)
+    parser.add_argument("--onnx_path", type=str) # NOTE 这个是事先已经准备好的speech token tokenizer，如何训练是个大的问题
     parser.add_argument("--num_thread", type=int, default=8)
     args = parser.parse_args()
 
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     with open('{}/wav.scp'.format(args.dir)) as f:
         for l in f:
             l = l.replace('\n', '').split()
-            utt2wav[l[0]] = l[1]
+            utt2wav[l[0]] = l[1] # '5694_64038_000014_000000 /workspace/asr/CosyVoice/data/tts/openslr/libritts/LibriTTS/dev-clean/5694/64038/5694_64038_000014_000000.wav\n'
 
     option = onnxruntime.SessionOptions()
     option.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL

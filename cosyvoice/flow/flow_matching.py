@@ -161,7 +161,7 @@ class ConditionalCFM(BASECFM):
                 shape: (batch_size, n_feats, mel_timesteps)
             mask (torch.Tensor): target mask
                 shape: (batch_size, 1, mel_timesteps)
-            mu (torch.Tensor): output of encoder
+            mu (torch.Tensor): output of encoder of speech tokens
                 shape: (batch_size, n_feats, mel_timesteps)
             spks (torch.Tensor, optional): speaker embedding. Defaults to None.
                 shape: (batch_size, spk_emb_dim)
@@ -171,30 +171,31 @@ class ConditionalCFM(BASECFM):
             y: conditional flow
                 shape: (batch_size, n_feats, mel_timesteps)
         """
-        import ipdb; ipdb.set_trace()
+        import ipdb; ipdb.set_trace() # NOTE for training also for inferencing??? TODO
         b, _, t = mu.shape
 
         # random timestep
-        t = torch.rand([b, 1, 1], device=mu.device, dtype=mu.dtype)
+        t = torch.rand([b, 1, 1], device=mu.device, dtype=mu.dtype) # [20, 1, 1]
         if self.t_scheduler == 'cosine':
-            t = 1 - torch.cos(t * 0.5 * torch.pi)
+            t = 1 - torch.cos(t * 0.5 * torch.pi) # [20, 1, 1]
         # sample noise p(x_0)
-        z = torch.randn_like(x1) # z=epsilon=noise=X_0 ~ N(0, I_d)
+        z = torch.randn_like(x1) # z=epsilon=noise=X_0 ~ N(0, I_d), [20, 80, 95]
 
-        y = (1 - (1 - self.sigma_min) * t) * z + t * x1 # 论文中的公式(11)
-        u = x1 - (1 - self.sigma_min) * z # NOTE 如果u和t无关，就有意思了，毕竟t是刚随机采样出来的，x1不可能和t相关. 这里，u是构造出来的target，让NN的预测结果和u的mse loss最小化.
+        y = (1 - (1 - self.sigma_min) * t) * z + t * x1 # 论文中的公式(11) 这是对z纯噪音和x1真正的梅尔谱，的一个线性组合 NOTE 因为self.sigma_min=10^-6，上面相当于y = (1-t)*z + t*x1
+        u = x1 - (1 - self.sigma_min) * z # NOTE 如果u和t无关，就有意思了，毕竟t是刚随机采样出来的，x1不可能和t相关. 这里，u是构造出来的target，让NN的预测结果pred和u的mse loss最小化. u=dy/dt，是y在时刻t的梯度（也是指明了方向+强度=速度） u.shape=[20, 80, 95]
 
         # during training, we randomly drop condition to trade off mode coverage and sample fidelity
-        if self.training_cfg_rate > 0:
-            cfg_mask = torch.rand(b, device=x1.device) > self.training_cfg_rate
-            mu = mu * cfg_mask.view(-1, 1, 1)
+        if self.training_cfg_rate > 0: # 0.2 NOTE
+            cfg_mask = torch.rand(b, device=x1.device) > self.training_cfg_rate # 20个sample里面，按照0.2的概率，设置为cfg, classifier-free generation，即丢弃掉guidance; 例如，目前是17个True, 3个False
+            mu = mu * cfg_mask.view(-1, 1, 1) # (20, 80, 95) * (20, 1, 1) 
             spks = spks * cfg_mask.view(-1, 1)
             cond = cond * cfg_mask.view(-1, 1, 1)
 
-        pred = self.estimator(y, mask, mu, t.squeeze(), spks, cond, streaming=streaming)
-        loss = F.mse_loss(pred * mask, u * mask, reduction="sum") / (torch.sum(mask) * u.shape[1])
+        pred = self.estimator(y, mask, mu, t.squeeze(), spks, cond, streaming=streaming) # NOTE self.estimator = class ConditionalDecoder, pred.shape=[20, 80, 95]
+        loss = F.mse_loss(pred * mask, u * mask, reduction="sum") / (torch.sum(mask) * u.shape[1]) # [20, 80, 95] * [20, 1, 95] -> [20, 80, 95] for both 'pred' and 'u' NOTE MSE loss ||y-y*||^2
         return loss, y
-
+        # loss=tensor(2.1628, device='cuda:0', grad_fn=<DivBackward0>)
+        # y.shape = [20, 80, 95] 是类似于(1-t)*epsilon(z) + t*x1，即纯噪音z和真实的梅尔谱x1之间的线性组合
 
 class CausalConditionalCFM(ConditionalCFM):
     def __init__(self, in_channels, cfm_params, n_spks=1, spk_emb_dim=64, estimator: torch.nn.Module = None):

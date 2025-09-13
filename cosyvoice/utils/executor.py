@@ -34,7 +34,9 @@ class Executor:
         self.rank = int(os.environ.get('RANK', 0))
         self.device = torch.device('cuda:{}'.format(self.rank))
 
-    def train_one_epoc(self, model, optimizer, scheduler, train_data_loader, cv_data_loader, writer, info_dict, scaler, group_join, ref_model=None):
+    # TODO 
+    ###def train_one_epoc(self, model, optimizer, scheduler, train_data_loader, cv_data_loader, writer, info_dict, scaler, group_join, ref_model=None):
+    def train_one_epoc(self, model, optimizer, scheduler, train_data_loader, cv_data_loader, writer, info_dict, scaler, ref_model=None):
         ''' Train one epoch
         '''
 
@@ -48,28 +50,30 @@ class Executor:
         model.train()
         if self.ref_model is not None:
             self.ref_model.eval()
-        model_context = model.join if info_dict['train_engine'] == 'torch_ddp' else nullcontext
+        ###model_context = model.join if info_dict['train_engine'] == 'torch_ddp' else nullcontext # TODO
+        model_context = nullcontext #model.join if info_dict['train_engine'] == 'torch_ddp' else nullcontext
         with model_context():
-            for batch_idx, batch_dict in enumerate(train_data_loader):
+            for batch_idx, batch_dict in enumerate(train_data_loader): # dict_keys(['utts'=list with 22 case ids, 'speech_token'=[22, 51], 'speech_token_len'.shape=[22] tensor 1D, 'speech_feat'->[22,87,80], 'speech_feat_len'.shape=[22] of 1D, 'text'=list with 22 elements, 'text_token'=[22, 6], 'text_token_len'=tensor1d=[22], 'utt_embedding' -> [22, 192], 'spk_embedding' -> [22, 192], 'embedding' -> [22, 192] = 'utt_embedding']) 
                 info_dict["tag"] = "TRAIN"
                 info_dict["step"] = self.step
                 info_dict["epoch"] = self.epoch
                 info_dict["batch_idx"] = batch_idx
-                if cosyvoice_join(group_join, info_dict):
-                    break
+                ###if cosyvoice_join(group_join, info_dict): # NOTE TODO
+                ###    break
 
                 # Disable gradient synchronizations across DDP processes.
                 # Within this context, gradients will be accumulated on module
                 # variables, which will later be synchronized.
                 if info_dict['train_engine'] == 'torch_ddp' and (batch_idx + 1) % info_dict["accum_grad"] != 0:
-                    context = model.no_sync
+                    context = nullcontext ###model.no_sync # TODO
                 # Used for single gpu training and DDP gradient synchronization
                 # processes.
                 else:
                     context = nullcontext
 
+                import ipdb; ipdb.set_trace()
                 with context():
-                    info_dict = batch_forward(model, batch_dict, scaler, info_dict, ref_model=self.ref_model, dpo_loss=self.dpo_loss)
+                    info_dict = batch_forward(model, batch_dict, scaler, info_dict, ref_model=self.ref_model, dpo_loss=self.dpo_loss) # NOTE
                     info_dict = batch_backward(model, scaler, info_dict)
 
                 info_dict = update_parameter_and_lr(model, optimizer, scheduler, scaler, info_dict)
@@ -77,12 +81,12 @@ class Executor:
                 # NOTE specify save_per_step in cosyvoice.yaml if you want to enable step save
                 if info_dict['save_per_step'] > 0 and (self.step + 1) % info_dict['save_per_step'] == 0 and \
                    (batch_idx + 1) % info_dict["accum_grad"] == 0:
-                    dist.barrier()
+                    ### dist.barrier() # TODO
                     self.cv(model, cv_data_loader, writer, info_dict, on_batch_end=False)
                     model.train()
                 if (batch_idx + 1) % info_dict["accum_grad"] == 0:
                     self.step += 1
-        dist.barrier()
+        ###dist.barrier() # TODO
         self.cv(model, cv_data_loader, writer, info_dict, on_batch_end=True)
 
     def train_one_epoc_gan(self, model, optimizer, scheduler, optimizer_d, scheduler_d, train_data_loader, cv_data_loader,

@@ -39,15 +39,15 @@ def main(args):
     utt2embedding, spk2embedding = {}, {}
     for future in tqdm(as_completed(all_task)):
         utt, embedding = future.result()
-        utt2embedding[utt] = embedding
+        utt2embedding[utt] = embedding # list with 192 elements
         spk = utt2spk[utt]
         if spk not in spk2embedding:
             spk2embedding[spk] = []
         spk2embedding[spk].append(embedding)
     for k, v in spk2embedding.items():
-        spk2embedding[k] = torch.tensor(v).mean(dim=0).tolist()
-    torch.save(utt2embedding, "{}/utt2embedding.pt".format(args.dir))
-    torch.save(spk2embedding, "{}/spk2embedding.pt".format(args.dir))
+        spk2embedding[k] = torch.tensor(v).mean(dim=0).tolist() # NOTE 这是求了一下均值, 每个speaker下的所有音频 -> speaker embed vec -> mean
+    torch.save(utt2embedding, "{}/utt2embedding.pt".format(args.dir)) # 'dev-clean' with 5736 elements, key='5694_64038_000014_000000', value=list with 192 elements
+    torch.save(spk2embedding, "{}/spk2embedding.pt".format(args.dir)) # 'dev-clean' with 40 elements, key='5694', value=list with 192 elements, this is the average of all wav files of current speaker under current 'dev-clean' dataset
 
 
 if __name__ == "__main__":
@@ -60,18 +60,19 @@ if __name__ == "__main__":
     utt2wav, utt2spk = {}, {}
     with open('{}/wav.scp'.format(args.dir)) as f:
         for l in f:
-            l = l.replace('\n', '').split()
+            l = l.replace('\n', '').split() # '5694_64038_000014_000000 /workspace/asr/CosyVoice/data/tts/openslr/libritts/LibriTTS/dev-clean/5694/64038/5694_64038_000014_000000.wav\n'
             utt2wav[l[0]] = l[1]
     with open('{}/utt2spk'.format(args.dir)) as f:
         for l in f:
-            l = l.replace('\n', '').split()
+            l = l.replace('\n', '').split() # '5694_64038_000014_000000 5694\n'
             utt2spk[l[0]] = l[1]
 
     option = onnxruntime.SessionOptions()
     option.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
     option.intra_op_num_threads = 1
     providers = ["CPUExecutionProvider"]
-    ort_session = onnxruntime.InferenceSession(args.onnx_path, sess_options=option, providers=providers)
+    ort_session = onnxruntime.InferenceSession(args.onnx_path, sess_options=option, providers=providers) # args.onnx_path='../../../pretrained_models/CosyVoice-300M/campplus.onnx'
+    # NOTE 这个campplus.onnx模型，是事先就有的，问题在于，如何构造这样的模型呢???
     executor = ThreadPoolExecutor(max_workers=args.num_thread)
 
     main(args)

@@ -2,8 +2,8 @@
 # Copyright 2024 Alibaba Inc. All Rights Reserved.
 . ./path.sh || exit 1;
 
-stage=-1
-stop_stage=-1 #3
+stage=1 #-1
+stop_stage=1 #-1 #3
 
 data_url=www.openslr.org/resources/60
 #data_dir=/mnt/lyuxiang.lx/data/tts/openslr/libritts
@@ -17,18 +17,23 @@ if [ ${stage} -le -1 ] && [ ${stop_stage} -ge -1 ]; then
   done
 fi
 
+# TODO 准备数据，就是准备wav.scp, text, utt2spk, spk2utt这几个文本文件
 if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
   echo "Data preparation, prepare wav.scp/text/utt2spk/spk2utt"
-  for x in train-clean-100 train-clean-360 train-other-500 dev-clean dev-other test-clean test-other; do
+  #for x in train-clean-100 train-clean-360 train-other-500 dev-clean dev-other test-clean test-other; do
+  for x in dev-clean; do
     mkdir -p data/$x
     python -m ipdb local/prepare_data.py --src_dir $data_dir/LibriTTS/$x --des_dir data/$x
   done
 fi
 
+# TODO 这个就是抽取speaker embedding vector信息
 if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
   echo "Extract campplus speaker embedding, you will get spk2embedding.pt and utt2embedding.pt in data/$x dir"
+  #for x in train-clean-100 train-clean-360 train-other-500 dev-clean dev-other test-clean test-other; do
+  #for x in dev-clean; do
   for x in train-clean-100 train-clean-360 train-other-500 dev-clean dev-other test-clean test-other; do
-    python -m ipdb tools/extract_embedding.py --dir data/$x \
+    python tools/extract_embedding.py --dir data/$x \
       --onnx_path $pretrained_model_dir/campplus.onnx
   done
 fi

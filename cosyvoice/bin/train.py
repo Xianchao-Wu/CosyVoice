@@ -95,13 +95,14 @@ def get_args():
 
 @record
 def main():
+    import ipdb; ipdb.set_trace()
     args = get_args()
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s %(levelname)s %(message)s')
     # gan train has some special initialization logic
     gan = True if args.model == 'hifigan' else False
 
-    override_dict = {k: None for k in ['llm', 'flow', 'hift', 'hifigan'] if k != args.model}
+    override_dict = {k: None for k in ['llm', 'flow', 'hift', 'hifigan'] if k != args.model} # {'flow': None, 'hift': None, 'hifigan': None}
     if gan is True:
         override_dict.pop('hift')
     try:
@@ -109,15 +110,17 @@ def main():
             configs = load_hyperpyyaml(f, overrides={**override_dict, 'qwen_pretrain_path': args.qwen_pretrain_path})
     except Exception:
         with open(args.config, 'r') as f:
-            configs = load_hyperpyyaml(f, overrides=override_dict)
+            configs = load_hyperpyyaml(f, overrides=override_dict) # NOTE here 'llm' 已经初始化好了
     if gan is True:
         configs['train_conf'] = configs['train_conf_gan']
     configs['train_conf'].update(vars(args))
 
     # Init env for ddp
-    init_distributed(args)
+    import ipdb; ipdb.set_trace()
+    ###init_distributed(args) # TODO for debug only
 
     # Get dataset & dataloader
+    import ipdb; ipdb.set_trace()
     train_dataset, cv_dataset, train_data_loader, cv_data_loader = \
         init_dataset_and_dataloader(args, configs, gan, args.dpo)
 
@@ -130,23 +133,26 @@ def main():
     # load checkpoint
     if args.dpo is True:
         configs[args.model].forward = configs[args.model].forward_dpo
-    model = configs[args.model]
+    import ipdb; ipdb.set_trace()
+    model = configs[args.model] # <class 'cosyvoice.llm.llm.TransformerLM'>, 'llm', 310,718,465 parameters -> 300M case in '../../../pretrained_models/CosyVoice-300M/llm.pt' ||| <class 'cosyvoice.flow.flow.MaskedDiffWithXvec'>, 104M=104,874,752, '../../../pretrained_models/CosyVoice-300M/flow.pt'
     start_step, start_epoch = 0, -1
     if args.checkpoint is not None:
         if os.path.exists(args.checkpoint):
             state_dict = torch.load(args.checkpoint, map_location='cpu')
             model.load_state_dict(state_dict, strict=False)
             if 'step' in state_dict:
-                start_step = state_dict['step']
+                start_step = state_dict['step'] # not in
             if 'epoch' in state_dict:
-                start_epoch = state_dict['epoch']
+                start_epoch = state_dict['epoch'] # not in
         else:
             logging.warning('checkpoint {} do not exsist!'.format(args.checkpoint))
 
     # Dispatch model from cpu to gpu
-    model = wrap_cuda_model(args, model)
+    ###model = wrap_cuda_model(args, model) # TODO
+    model = model.cuda()
 
     # Get optimizer & scheduler
+    import ipdb; ipdb.set_trace()
     model, optimizer, scheduler, optimizer_d, scheduler_d = init_optimizer_and_scheduler(args, configs, model, gan)
     scheduler.set_step(start_step)
     if scheduler_d is not None:
@@ -170,7 +176,7 @@ def main():
         ref_model, dpo_loss = None, None
 
     # Get executor
-    executor = Executor(gan=gan, ref_model=ref_model, dpo_loss=dpo_loss)
+    executor = Executor(gan=gan, ref_model=ref_model, dpo_loss=dpo_loss) # gan=False, ref_model=None, dpo_loss=None
     executor.step = start_step
 
     # Init scaler, used for pytorch amp mixed precision training
@@ -181,13 +187,15 @@ def main():
     for epoch in range(start_epoch + 1, info_dict['max_epoch']):
         executor.epoch = epoch
         train_dataset.set_epoch(epoch)
-        dist.barrier()
-        group_join = dist.new_group(backend="gloo", timeout=datetime.timedelta(seconds=args.timeout))
+        ###dist.barrier() # TODO
+        #group_join = dist.new_group(backend="gloo", timeout=datetime.timedelta(seconds=args.timeout))
         if gan is True:
             executor.train_one_epoc_gan(model, optimizer, scheduler, optimizer_d, scheduler_d, train_data_loader, cv_data_loader,
                                         writer, info_dict, scaler, group_join)
         else:
-            executor.train_one_epoc(model, optimizer, scheduler, train_data_loader, cv_data_loader, writer, info_dict, scaler, group_join, ref_model=ref_model)
+            import ipdb; ipdb.set_trace()
+            ###executor.train_one_epoc(model, optimizer, scheduler, train_data_loader, cv_data_loader, writer, info_dict, scaler, group_join, ref_model=ref_model)
+            executor.train_one_epoc(model, optimizer, scheduler, train_data_loader, cv_data_loader, writer, info_dict, scaler, ref_model=ref_model)
         dist.destroy_process_group(group_join)
 
 

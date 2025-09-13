@@ -193,13 +193,15 @@ def init_summarywriter(args):
 
 
 def save_model(model, model_name, info_dict):
+    import ipdb; ipdb.set_trace()
     rank = int(os.environ.get('RANK', 0))
     model_dir = info_dict["model_dir"]
     save_model_path = os.path.join(model_dir, '{}.pt'.format(model_name))
 
     if info_dict["train_engine"] == "torch_ddp":
         if rank == 0:
-            torch.save({**model.module.state_dict(), 'epoch': info_dict['epoch'], 'step': info_dict['step']}, save_model_path)
+            ###torch.save({**model.module.state_dict(), 'epoch': info_dict['epoch'], 'step': info_dict['step']}, save_model_path) # TODO for debug only
+            torch.save({**model.state_dict(), 'epoch': info_dict['epoch'], 'step': info_dict['step']}, save_model_path)
     else:
         with torch.no_grad():
             model.save_checkpoint(save_dir=model_dir,
@@ -237,7 +239,7 @@ def cosyvoice_join(group_join, info_dict):
 
 def batch_forward(model, batch, scaler, info_dict, ref_model=None, dpo_loss=None):
     device = int(os.environ.get('LOCAL_RANK', 0))
-
+    import ipdb; ipdb.set_trace()
     dtype = info_dict["dtype"]
     if dtype == "fp16":
         dtype = torch.float16
@@ -252,7 +254,7 @@ def batch_forward(model, batch, scaler, info_dict, ref_model=None, dpo_loss=None
         autocast = torch.cuda.amp.autocast(enabled=True, dtype=dtype, cache_enabled=False)
 
     with autocast:
-        info_dict['loss_dict'] = model(batch, device)
+        info_dict['loss_dict'] = model(batch, device) # NOTE {'loss': tensor(3.2007, device='cuda:0', grad_fn=<DivBackward0>), 'acc': tensor(0.2478, device='cuda:0')} ||| <class 'cosyvoice.flow.flow.MaskedDiffWithXvec'>
         if ref_model is not None and dpo_loss is not None:
             chosen_logps = info_dict['loss_dict']["chosen_logps"]
             rejected_logps = info_dict['loss_dict']["rejected_logps"]
@@ -271,7 +273,7 @@ def batch_forward(model, batch, scaler, info_dict, ref_model=None, dpo_loss=None
             info_dict['loss_dict']["dpo_acc"] = dpo_acc
             info_dict['loss_dict']["chosen_reward"] = chosen_reward.mean()
             info_dict['loss_dict']["reject_reward"] = reject_reward.mean()
-    return info_dict
+    return info_dict # {'optim': 'adam', 'optim_conf': {'lr': 0.001}, 'scheduler': 'warmuplr', 'scheduler_conf': {'warmup_steps': 2500}, 'max_epoch': 200, 'grad_clip': 5, 'accum_grad': 2, 'log_interval': 100, 'save_per_step': -1, 'train_engine': 'torch_ddp', 'model': 'llm', 'ref_model': None, 'config': 'conf/cosyvoice.yaml', 'train_data': 'data/train.data.list', 'cv_data': 'data/dev.data.list', 'qwen_pretrain_path': None, 'checkpoint': '../../../pretrained_models/CosyVoice-300M/llm.pt', 'model_dir': '/workspace/asr/CosyVoice/examples/libritts/cosyvoice/exp/cosyvoice/llm/torch_ddp', 'tensorboard_dir': '/workspace/asr/CosyVoice/examples/libritts/cosyvoice/tensorboard/cosyvoice/llm/torch_ddp', 'dist_backend': 'nccl', 'num_workers': 2, 'prefetch': 100, 'pin_memory': True, 'use_amp': True, 'dpo': False, 'save_states': 'model+optimizer', 'timeout': 60, 'deepspeed': False, 'deepspeed_config': './conf/ds_stage2.json', 'deepscale': False, 'deepscale_config': None, 'dtype': 'bf16', 'step': 0, 'epoch': 0, 'save_time': '12/09/2025 08:19:32', 'tag': 'TRAIN', 'batch_idx': 0, 'loss_dict': {'loss': tensor(3.2007, device='cuda:0', grad_fn=<DivBackward0>), 'acc': tensor(0.2478, device='cuda:0')}}
 
 
 def batch_backward(model, scaler, info_dict):

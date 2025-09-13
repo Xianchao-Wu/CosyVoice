@@ -46,7 +46,7 @@ class TransformerLM(torch.nn.Module):
     ):
         super().__init__()
         self.llm_input_size = llm_input_size
-        self.speech_token_size = speech_token_size
+        self.speech_token_size = speech_token_size # vocab size for speech tokens NOTE
         # 1. build text token inputs related modules
         self.text_embedding = torch.nn.Embedding(text_token_size, text_encoder_input_size)
         self.text_encoder = text_encoder
@@ -77,23 +77,23 @@ class TransformerLM(torch.nn.Module):
 
     def encode(
             self,
-            text: torch.Tensor,
-            text_lengths: torch.Tensor,
+            text: torch.Tensor, # [22, 6, 512]
+            text_lengths: torch.Tensor, # [22]
     ):
-        encoder_out, encoder_mask = self.text_encoder(text, text_lengths, decoding_chunk_size=1, num_decoding_left_chunks=-1)
+        encoder_out, encoder_mask = self.text_encoder(text, text_lengths, decoding_chunk_size=1, num_decoding_left_chunks=-1) # 6 ConformerEncoderLayer, [22, 6, 1024], [22, 1, 6] with False for padding space
         encoder_out_lens = encoder_mask.squeeze(1).sum(1)
-        encoder_out = self.text_encoder_affine_layer(encoder_out)
-        return encoder_out, encoder_out_lens
+        encoder_out = self.text_encoder_affine_layer(encoder_out) # [22, 6, 1024] -> Linear(in_features=1024, out_features=1024, bias=True) -> [22, 6, 1024]
+        return encoder_out, encoder_out_lens # encoder_out.shape=[22, 6, 1024], lens=[22]
 
     def pad_unpad_sequence(self, sos_eos_emb, embedding, text_token, text_token_len, task_id_emb, speech_token, speech_token_len):
         text_token = unpad_sequence(text_token, text_token_len.cpu(), batch_first=True)
         speech_token = unpad_sequence(speech_token, speech_token_len.cpu(), batch_first=True)
-        lm_input = [torch.concat([sos_eos_emb.squeeze(dim=0), embedding[i], text_token[i], task_id_emb.squeeze(dim=0), speech_token[i]], dim=0)
+        lm_input = [torch.concat([sos_eos_emb.squeeze(dim=0), embedding[i], text_token[i], task_id_emb.squeeze(dim=0), speech_token[i]], dim=0) # NOTE 1=S, 1=spk, 6=text, 1=T, 46=speech.tok -> [55, 1024] for the 0-th element; totally is: 22 tensors, each tensor is alike: [55, 1024], [58, 1024], ... 
                     for i in range(len(text_token))]
         lm_input_len = torch.tensor([i.size(0) for i in lm_input], dtype=torch.int32)
         lm_input = pad_sequence(lm_input, batch_first=True, padding_value=IGNORE_ID)
         return lm_input, lm_input_len
-
+        # lm_input.shape=[22, 59, 1024], lm_input_len.shape=[22] alike: [55, 58, ...] 
     def forward(
             self,
             batch: dict,
@@ -106,43 +106,44 @@ class TransformerLM(torch.nn.Module):
             audio: (B, T, N) or (B, T)
             audio_lengths: (B,)
         """
-        text_token = batch['text_token'].to(device)
-        text_token_len = batch['text_token_len'].to(device)
-        speech_token = batch['speech_token'].to(device)
-        speech_token_len = batch['speech_token_len'].to(device)
-        embedding = batch['embedding'].to(device)
+        import ipdb; ipdb.set_trace() # NOTE this method is for training!
+        text_token = batch['text_token'].to(device) # [22, 6] 2d tensor
+        text_token_len = batch['text_token_len'].to(device) # [22] 1d tensor
+        speech_token = batch['speech_token'].to(device) # [22, 51] 2d tensor
+        speech_token_len = batch['speech_token_len'].to(device) # [22] 1d tensor
+        embedding = batch['embedding'].to(device) # [22, 192]
 
-        # 1. prepare llm_target
+        # 1. prepare llm_target: S text.seq T specch.token.seq NOTE
         lm_target = [torch.tensor([IGNORE_ID] * (2 + text_token_len[i]) + speech_token[i, :speech_token_len[i]].tolist() +
-                                  [self.speech_token_size]) for i in range(text_token.size(0))]
-        lm_target = pad_sequence(lm_target, batch_first=True, padding_value=IGNORE_ID).to(device)
+                                  [self.speech_token_size]) for i in range(text_token.size(0))] # NOTE self.speech_token_size is the vocab size of speech tokens, 这里看起来应该作为标识token了
+        lm_target = pad_sequence(lm_target, batch_first=True, padding_value=IGNORE_ID).to(device) # 就是在最右边追加-1, lm_target.shape=[22, 59]
 
         # 1. encode text_token
-        text_token = self.text_embedding(text_token)
-        text_token, text_token_len = self.encode(text_token, text_token_len)
+        text_token = self.text_embedding(text_token) # [22, 6] -> Embedding(51866, 512) -> [22, 6, 512]
+        text_token, text_token_len = self.encode(text_token, text_token_len) # [22, 6, 1024], [22]
 
         # 2. embedding projection
-        embedding = F.normalize(embedding, dim=1)
-        embedding = self.spk_embed_affine_layer(embedding)
-        embedding = embedding.unsqueeze(1)
+        embedding = F.normalize(embedding, dim=1) # [22, 192]
+        embedding = self.spk_embed_affine_layer(embedding) # -> Linear(in_features=192, out_features=1024, bias=True) -> [22, 1024]
+        embedding = embedding.unsqueeze(1) # [22, 1, 1024]
 
         # 3. eos and task_id
-        sos_eos_emb = self.llm_embedding.weight[self.sos_eos].reshape(1, 1, -1)
-        task_id_emb = self.llm_embedding.weight[self.task_id].reshape(1, 1, -1)
+        sos_eos_emb = self.llm_embedding.weight[self.sos_eos].reshape(1, 1, -1) # 0 -> [1, 1, 1024]
+        task_id_emb = self.llm_embedding.weight[self.task_id].reshape(1, 1, -1) # 1 -> [1, 1, 1024]
 
         # 4. encode speech_token
-        speech_token = self.speech_embedding(speech_token)
+        speech_token = self.speech_embedding(speech_token) # [22, 51] -> Embedding(4096, 1024) -> [22, 51, 1024]
 
         # 5. unpad and pad
         lm_input, lm_input_len = self.pad_unpad_sequence(sos_eos_emb, embedding, text_token, text_token_len,
-                                                         task_id_emb, speech_token, speech_token_len)
+                                                         task_id_emb, speech_token, speech_token_len) # NOTE
 
         # 6. run lm forward
-        lm_output, lm_output_mask = self.llm(lm_input, lm_input_len.to(device))
-        logits = self.llm_decoder(lm_output)
-        loss = self.criterion_ce(logits, lm_target)
-        acc = th_accuracy(logits.view(-1, self.speech_token_size + 1), lm_target, ignore_label=IGNORE_ID)
-        return {'loss': loss, 'acc': acc}
+        lm_output, lm_output_mask = self.llm(lm_input, lm_input_len.to(device)) # NOTE > /workspace/asr/CosyVoice/cosyvoice/transformer/encoder.py(163)forward()
+        logits = self.llm_decoder(lm_output) # Linear(in_features=1024, out_features=4097, bias=True) # NOTE 需要注意的是，这里是4097! 不是4096了 -> [22, 59, 4097]
+        loss = self.criterion_ce(logits, lm_target) # logits.shape=[22, 59, 4097], lm_target.shape=[22, 59] #   (criterion): KLDivLoss()
+        acc = th_accuracy(logits.view(-1, self.speech_token_size + 1), lm_target, ignore_label=IGNORE_ID) # 4096+1, first=[1298, 4097], second=[22, 59]
+        return {'loss': loss, 'acc': acc} # tensor(3.2007, device='cuda:0', grad_fn=<DivBackward0>), tensor(0.2478, device='cuda:0')
 
     def sampling_ids(
             self,

@@ -61,43 +61,45 @@ class MaskedDiffWithXvec(torch.nn.Module):
             self,
             batch: dict,
             device: torch.device,
-    ) -> Dict[str, Optional[torch.Tensor]]:
-        token = batch['speech_token'].to(device)
-        token_len = batch['speech_token_len'].to(device)
-        feat = batch['speech_feat'].to(device)
-        feat_len = batch['speech_feat_len'].to(device)
-        embedding = batch['embedding'].to(device)
+    ) -> Dict[str, Optional[torch.Tensor]]: # NOTE for model training
+        import ipdb; ipdb.set_trace() # NOTE forward of class MaskedDiffWithXvec
+        token = batch['speech_token'].to(device) # [20, 56], pad.id=0; 语音-> speech tokenizer -> speech_token
+        token_len = batch['speech_token_len'].to(device) # [20]
+        feat = batch['speech_feat'].to(device) # [20, 95, 80], pad.id=0; 语音 -> 梅尔谱 NOTE 这个就是我们真正的目标数据！flow matching预测出来的也是梅尔谱
+        feat_len = batch['speech_feat_len'].to(device) # [20], tensor([82, 95, 94, 93, 93 ...
+        embedding = batch['embedding'].to(device) # [20, 192], speaker embedding vectors
 
         # xvec projection
         embedding = F.normalize(embedding, dim=1)
-        embedding = self.spk_embed_affine_layer(embedding)
+        embedding = self.spk_embed_affine_layer(embedding) # [20, 192] -> Linear(in_features=192, out_features=80, bias=True) -> [20, 80]
 
         # concat text and prompt_text
-        mask = (~make_pad_mask(token_len)).float().unsqueeze(-1).to(device)
-        token = self.input_embedding(torch.clamp(token, min=0)) * mask
+        mask = (~make_pad_mask(token_len)).float().unsqueeze(-1).to(device) # [20, 56, 1], 0 as pad.id
+        token = self.input_embedding(torch.clamp(token, min=0)) * mask # speech token (20, 56) -> emb(4096, 512) -> (20, 56, 512) 
 
-        # text encode
-        h, h_lengths = self.encoder(token, token_len)
-        h = self.encoder_proj(h)
-        h, h_lengths = self.length_regulator(h, feat_len)
+        # speech token's encode
+        h, h_lengths = self.encoder(token, token_len) # encoder for speech token, h.shape=[20, 56, 512], h_lengths.shape=[20, 1, 56] with True for with token and False for padding
+        h = self.encoder_proj(h) # [20, 56, 512] -> Linear(in_features=512, out_features=80, bias=True) -> [20, 56, 80]
+        h, h_lengths = self.length_regulator(h, feat_len) # multi-layer conv1d # NOTE 这个很重要，是基于梅尔谱的长度，来对speech token的长度进行regulator了。h从[20, 56, 80] -> length_regulator -> [20, 95, 80]; h_lengths=[20] with tensor([82, 95, 94, 93, 93, 90, 89, 89, 83, 83, 24, 81, 80, 74, 67, 64, 62, 60,...]
 
         # get conditions
-        conds = torch.zeros(feat.shape, device=token.device)
+        conds = torch.zeros(feat.shape, device=token.device) # conds.shape=[20, 95, 80], all 0
         for i, j in enumerate(feat_len):
-            if random.random() < 0.5:
+            if random.random() < 0.5: # NOTE TODO why 0.5?
                 continue
-            index = random.randint(0, int(0.3 * j))
-            conds[i, :index] = feat[i, :index]
-        conds = conds.transpose(1, 2)
+            index = random.randint(0, int(0.3 * j)) # NOTE 
+            conds[i, :index] = feat[i, :index] # 前面30%的来自音频的梅尔谱，给conds
+        conds = conds.transpose(1, 2) # [20, 95, 80] -> [20, 80, 95]
 
-        mask = (~make_pad_mask(feat_len)).to(h)
+        mask = (~make_pad_mask(feat_len)).to(h) # mask.shape=[20, 95] 这个就是纯mask feat的
         # NOTE this is unnecessary, feat/h already same shape
+        import ipdb; ipdb.set_trace()
         loss, _ = self.decoder.compute_loss(
-            feat.transpose(1, 2).contiguous(),
-            mask.unsqueeze(1),
-            h.transpose(1, 2).contiguous(),
-            embedding,
-            cond=conds
+            feat.transpose(1, 2).contiguous(), # [20, 80, 95], 完整的梅尔谱, target
+            mask.unsqueeze(1), # [20, 1, 95] 1 for value and 0 for pad
+            h.transpose(1, 2).contiguous(), # [20, 80, 95], output of encoder of speech tokens
+            embedding, # [20, 80] speaker embedding 
+            cond=conds # [20, 80, 95] 
         )
         return {'loss': loss}
 
@@ -192,7 +194,7 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
             batch: dict,
             device: torch.device,
     ) -> Dict[str, Optional[torch.Tensor]]:
-        import ipdb; ipdb.set_trace()
+        import ipdb; ipdb.set_trace() # NOTE forward of CausalMaskedDiffWithXvec
         token = batch['speech_token'].to(device)
         token_len = batch['speech_token_len'].to(device)
         feat = batch['speech_feat'].to(device)
@@ -224,6 +226,7 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
         conds = conds.transpose(1, 2)
 
         mask = (~make_pad_mask(h_lengths.sum(dim=-1).squeeze(dim=1))).to(h)
+        import ipdb; ipdb.set_trace()
         loss, _ = self.decoder.compute_loss(
             feat.transpose(1, 2).contiguous(),
             mask.unsqueeze(1),
