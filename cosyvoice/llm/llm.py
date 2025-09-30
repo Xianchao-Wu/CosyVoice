@@ -56,8 +56,8 @@ class TransformerLM(torch.nn.Module):
         )
 
         # 2. build speech token language model related modules
-        self.sos_eos = 0
-        self.task_id = 1
+        self.sos_eos = 0 # NOTE 需要知道的是，self.sos_eos只用于作为self.llm_embedding的索引！！！不是vocabulary中的token id!!! 不是，不是，不是.
+        self.task_id = 1 # NOTE 同样，self.task_id也只是self.llm_embedding的索引！只是只是只是
         self.llm_embedding = torch.nn.Embedding(2, llm_input_size) # self.sos_eos (0), self.task_id (1)
         self.llm = llm
         self.llm_decoder = nn.Linear(llm_output_size, speech_token_size + 1)
@@ -115,7 +115,7 @@ class TransformerLM(torch.nn.Module):
 
         # 1. prepare llm_target: S text.seq T specch.token.seq NOTE
         lm_target = [torch.tensor([IGNORE_ID] * (2 + text_token_len[i]) + speech_token[i, :speech_token_len[i]].tolist() +
-                                  [self.speech_token_size]) for i in range(text_token.size(0))] # NOTE self.speech_token_size is the vocab size of speech tokens, 这里看起来应该作为标识token了
+                                  [self.speech_token_size]) for i in range(text_token.size(0))] # NOTE self.speech_token_size is the vocab size of speech tokens, 这里看起来应该作为标识token了, stop_token_ids的一个
         lm_target = pad_sequence(lm_target, batch_first=True, padding_value=IGNORE_ID).to(device) # 就是在最右边追加-1, lm_target.shape=[22, 59]
 
         # 1. encode text_token
@@ -276,31 +276,31 @@ class Qwen2LM(TransformerLM):
         torch.nn.Module.__init__(self)
         self.llm_input_size = llm_input_size # 896
         self.llm_output_size = llm_output_size # 896
-        self.speech_token_size = speech_token_size # 6561=3^8
+        self.speech_token_size = speech_token_size # 6561=3^8, NOTE [0, 1, ..., 6560] 这6561个token id是真正有效的codec/codebook中的词条
         # 2. build speech token language model related modules
         self.sos_eos = 0
         self.task_id = 1
-        self.fill_token = 2
+        self.fill_token = 2 # NOTE this is not used in current code!
 
-        self.llm_embedding = torch.nn.Embedding(2, llm_input_size) # (2, 896)
-        self.llm = llm
-        self.llm_decoder = nn.Linear(llm_output_size, speech_token_size + 3) # Linear(in_features=896, out_features=6564, bias=True)
+        self.llm_embedding = torch.nn.Embedding(2, llm_input_size) # (2, 896) for self.sos_eos=0, and self.task_id=1
+        self.llm = llm # <class 'cosyvoice.llm.llm.Qwen2Encoder'>
+        self.llm_decoder = nn.Linear(llm_output_size, speech_token_size + 3) # Linear(in_features=896, out_features=6564, bias=True) NOTE 这个是+3了，不是父类中的llm_decoder的+1了！ 这3个是和self.stop_token_ids对齐的
         self.criterion_ce = LabelSmoothingLoss(
-            size=speech_token_size + 3,
+            size=speech_token_size + 3, # 6561+3=6564
             padding_idx=IGNORE_ID, # -1
             smoothing=lsm_weight, # 0
             normalize_length=length_normalized_loss, # True
-        ) # <class 'cosyvoice.transformer.label_smoothing_loss.LabelSmoothingLoss'>
+        ) # <class 'cosyvoice.transformer.label_smoothing_loss.LabelSmoothingLoss'>, KLDivLoss()
 
         # 3. [Optional] build speech token related modules
         self.speech_embedding = torch.nn.Embedding(speech_token_size + 3, llm_input_size) # Embedding(6564, 896)
 
         # 4. sampling method
-        self.sampling = sampling # functools.partial(<function ras_sampling at 0x7faed0974310>, top_p=0.8, top_k=25, win_size=10, tau_r=0.1)
-        self.mix_ratio = mix_ratio # [5, 15]
+        self.sampling = sampling # functools.partial(<function ras_sampling at 0x7faed0974310>, top_p=0.8, top_k=25, win_size=10, tau_r=0.1), a method 'ras_sampling' in cosyvoice/utils/common.py:111
+        self.mix_ratio = mix_ratio # [5, 15] NOTE TODO 需要再次详细查看这个mix_ratio的细节
 
         # 5. vllm related
-        self.stop_token_ids = [speech_token_size + i for i in range(3)] # S T E, S=start_of_seq, E=end_of_seq, T=between text and speech; [6561, 6562, 6563]
+        self.stop_token_ids = [speech_token_size + i for i in range(3)] # S T E, S=start_of_seq, E=end_of_seq, T=between text and speech; [6561, 6562, 6563] NOTE 这三个是和speech token vocabulary对齐的
         self.vllm_output_queue = {}
 
     def prepare_lm_input_target(self, text_token, text_token_emb, text_token_len, speech_token, speech_token_emb, speech_token_len):
@@ -489,7 +489,7 @@ class Qwen2LM(TransformerLM):
                             self.vllm_output_queue[request_output.request_id].put(top_ids)
                 if self.vllm_output_queue[uuid].empty() is False:
                     top_ids = self.vllm_output_queue[uuid].get()
-                    if top_ids in self.stop_token_ids:
+                    if top_ids in self.stop_token_ids: # top_ids是一个token id，而stop_token_ids=[6561, 6562, 6563]
                         break
                     # in stream mode, yield token one by one
                     yield top_ids

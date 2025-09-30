@@ -26,6 +26,7 @@ class InterpolateRegulator(nn.Module):
             out_channels: int = None,
             groups: int = 1,
     ):
+        import ipdb; ipdb.set_trace()
         super().__init__()
         self.sampling_ratios = sampling_ratios
         out_channels = out_channels or channels
@@ -43,6 +44,7 @@ class InterpolateRegulator(nn.Module):
 
     def forward(self, x, ylens=None):
         # x in (B, T, D)
+        import ipdb; ipdb.set_trace()
         mask = (~make_pad_mask(ylens)).to(x).unsqueeze(-1)
         x = F.interpolate(x.transpose(1, 2).contiguous(), size=ylens.max(), mode='linear')
         out = self.model(x).transpose(1, 2).contiguous()
@@ -53,6 +55,7 @@ class InterpolateRegulator(nn.Module):
         # in inference mode, interploate prompt token and token(head/mid/tail) seprately, so we can get a clear separation point of mel
         # NOTE 20 corresponds to token_overlap_len in cosyvoice/cli/model.py
         # x in (B, T, D)
+        import ipdb; ipdb.set_trace()
         if x2.shape[1] > 40:
             x2_head = F.interpolate(x2[:, :20].transpose(1, 2).contiguous(), size=int(20 / input_frame_rate * 22050 / 256), mode='linear')
             x2_mid = F.interpolate(x2[:, 20:-20].transpose(1, 2).contiguous(), size=mel_len2 - int(20 / input_frame_rate * 22050 / 256) * 2,

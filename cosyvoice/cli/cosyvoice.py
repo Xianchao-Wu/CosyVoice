@@ -15,7 +15,7 @@ import os
 import time
 from typing import Generator
 from tqdm import tqdm
-from hyperpyyaml import load_hyperpyyaml
+from hyperpyyaml import load_hyperpyyaml # > /usr/local/lib/python3.10/dist-packages/hyperpyyaml/core.py(26)load_hyperpyyaml()
 from modelscope import snapshot_download
 import torch
 from cosyvoice.cli.frontend import CosyVoiceFrontEnd
@@ -100,7 +100,7 @@ class CosyVoice:
             model_input = self.frontend.frontend_zero_shot(i, prompt_text, prompt_speech_16k, self.sample_rate, zero_shot_spk_id) # 1. i是待tts的文本；2. prompt_text是提示文本，3. prompt_speech_16k.shape=[1, 55726]是提示文本对应的语音，4. self.sample_rate=24k, 5. zero_shot_spk_id=''是speaker id NOTE
             start_time = time.time()
             logging.info('synthesis text {}'.format(i))
-            for model_output in self.model.tts(**model_input, stream=stream, speed=speed): # <class 'cosyvoice.cli.model.CosyVoice2Model'>
+            for model_output in self.model.tts(**model_input, stream=stream, speed=speed): # <class 'cosyvoice.cli.model.CosyVoice2Model'> NOTE tts method
                 speech_len = model_output['tts_speech'].shape[1] / self.sample_rate
                 logging.info('yield speech len {}, rtf {}'.format(speech_len, (time.time() - start_time) / speech_len))
                 yield model_output
@@ -156,7 +156,7 @@ class CosyVoice2(CosyVoice):
         if not os.path.exists(hyper_yaml_path):
             raise ValueError('{} not found!'.format(hyper_yaml_path))
         with open(hyper_yaml_path, 'r') as f:
-            configs = load_hyperpyyaml(f, overrides={'qwen_pretrain_path': os.path.join(model_dir, 'CosyVoice-BlankEN')}) # NOTE 在这里初始化qwen2lm, flow-matching, hifigan三个模块
+            configs = load_hyperpyyaml(f, overrides={'qwen_pretrain_path': os.path.join(model_dir, 'CosyVoice-BlankEN')}) # NOTE 在这里初始化qwen2lm: <class 'cosyvoice.llm.llm.Qwen2LM'>, flow-matching: <class 'cosyvoice.flow.flow.CausalMaskedDiffWithXvec'>, hifigan: <class 'cosyvoice.hifigan.generator.HiFTGenerator'>; 三个模块
         assert get_model_type(configs) == CosyVoice2Model, 'do not use {} for CosyVoice2 initialization!'.format(model_dir)
         self.frontend = CosyVoiceFrontEnd(configs['get_tokenizer'],
                                           configs['feat_extractor'],

@@ -168,13 +168,13 @@ class UpsampleConformerEncoder(torch.nn.Module):
         self._output_size = output_size # 512
 
         self.global_cmvn = global_cmvn # none
-        self.embed = COSYVOICE_SUBSAMPLE_CLASSES[input_layer](
+        self.embed = COSYVOICE_SUBSAMPLE_CLASSES[input_layer]( # input_layer='linear'
             input_size, # 512
             output_size, # 512
             dropout_rate, # 0.1
             COSYVOICE_EMB_CLASSES[pos_enc_layer_type](output_size, # 512
                                                       positional_dropout_rate), # 0.1
-        ) # pos_enc_layer_type='rel_pos_espnet', 
+        ) # pos_enc_layer_type='rel_pos_espnet', <class 'cosyvoice.transformer.subsampling.LinearNoSubsampling'> 
 
         self.normalize_before = normalize_before # True
         self.after_norm = torch.nn.LayerNorm(output_size, eps=1e-5)
@@ -182,7 +182,7 @@ class UpsampleConformerEncoder(torch.nn.Module):
         self.use_dynamic_chunk = use_dynamic_chunk # false
         self.use_dynamic_left_chunk = use_dynamic_left_chunk # false
         self.gradient_checkpointing = gradient_checkpointing # false
-        activation = COSYVOICE_ACTIVATION_CLASSES[activation_type]() # SiLU()
+        activation = COSYVOICE_ACTIVATION_CLASSES[activation_type]() # SiLU(), activation_type='swish'
         # self-attention module definition
         encoder_selfattn_layer_args = (
             attention_heads, # 8
@@ -208,7 +208,7 @@ class UpsampleConformerEncoder(torch.nn.Module):
                     *encoder_selfattn_layer_args),
                 PositionwiseFeedForward(*positionwise_layer_args),
                 PositionwiseFeedForward(
-                    *positionwise_layer_args) if macaron_style else None, # macaron_style=false, TODO why not two FFN?
+                    *positionwise_layer_args) if macaron_style else None, # macaron_style=false, TODO why not two FFN? 目前只有一个ffn在ConformerEncoder
                 ConvolutionModule(
                     *convolution_layer_args) if use_cnn_module else None, # use_cnn_module=false
                 dropout_rate,
@@ -216,11 +216,11 @@ class UpsampleConformerEncoder(torch.nn.Module):
             ) for _ in range(num_blocks) # 6
         ])
         self.up_layer = Upsample1D(channels=512, out_channels=512, stride=2)
-        self.up_embed = COSYVOICE_SUBSAMPLE_CLASSES[input_layer](
+        self.up_embed = COSYVOICE_SUBSAMPLE_CLASSES[input_layer]( # input_layer='linear'
             input_size,
             output_size,
             dropout_rate,
-            COSYVOICE_EMB_CLASSES[pos_enc_layer_type](output_size,
+            COSYVOICE_EMB_CLASSES[pos_enc_layer_type](output_size, # pos_enc_layer_type='rel_pos_espnet'
                                                       positional_dropout_rate),
         )
         self.up_encoders = torch.nn.ModuleList([

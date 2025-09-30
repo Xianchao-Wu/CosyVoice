@@ -14,19 +14,19 @@ fi
 
 key=$1
 
-grep -s $key *.py  | grep -v examples | grep -v runtime
-grep -s $key */*.py | grep -v examples | grep -v runtime
-grep -s $key */*/*.py | grep -v examples | grep -v runtime
-grep -s $key */*/*/*.py | grep -v examples | grep -v runtime
-grep -s $key */*/*/*/*.py  | grep -v examples | grep -v runtime
-grep -s $key */*/*/*/*/*.py | grep -v examples | grep -v runtime
+grep -s $key *.py  | grep -v examples | grep -v runtime | grep -v third_party
+grep -s $key */*.py | grep -v examples | grep -v runtime  | grep -v third_party
+grep -s $key */*/*.py | grep -v examples | grep -v runtime  | grep -v third_party
+grep -s $key */*/*/*.py | grep -v examples | grep -v runtime | grep -v third_party
+grep -s $key */*/*/*/*.py  | grep -v examples | grep -v runtime | grep -v third_party
+grep -s $key */*/*/*/*/*.py | grep -v examples | grep -v runtime | grep -v third_party
 
-grep -s $key *.sh | grep -v examples | grep -v runtime
-grep -s $key */*.sh | grep -v examples | grep -v runtime
-grep -s $key */*/*.sh | grep -v examples | grep -v runtime
-grep -s $key */*/*/*.sh | grep -v examples | grep -v runtim
-grep -s $key */*/*/*/*.sh | grep -v examples | grep -v runtime
-grep -s $key */*/*/*/*/*.sh | grep -v examples | grep -v runtime
+grep -s $key *.sh | grep -v examples | grep -v runtime | grep -v third_party
+grep -s $key */*.sh | grep -v examples | grep -v runtime | grep -v third_party
+grep -s $key */*/*.sh | grep -v examples | grep -v runtime | grep -v third_party
+grep -s $key */*/*/*.sh | grep -v examples | grep -v runtim | grep -v third_party
+grep -s $key */*/*/*/*.sh | grep -v examples | grep -v runtime | grep -v third_party
+grep -s $key */*/*/*/*/*.sh | grep -v examples | grep -v runtime | grep -v third_party
 
 
 # TODO

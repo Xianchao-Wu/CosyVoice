@@ -33,7 +33,7 @@ class ConditionalCFM(BASECFM):
         in_channels = in_channels + (spk_emb_dim if n_spks > 0 else 0) # 240 + 80, spk=speaker
         # Just change the architecture of the estimator here
         self.estimator = estimator # <class 'cosyvoice.flow.decoder.CausalConditionalDecoder'>
-
+        # 1 down_block, 12 mid_blocks, 1 up_blocks, 1 final_block
     @torch.inference_mode()
     def forward(self, mu, mask, n_timesteps, temperature=1.0, spks=None, cond=None, prompt_len=0, cache=torch.zeros(1, 80, 0, 2)):
         """Forward diffusion
@@ -76,7 +76,7 @@ class ConditionalCFM(BASECFM):
             x (torch.Tensor): random noise
             t_span (torch.Tensor): n_timesteps interpolated
                 shape: (n_timesteps + 1,)
-            mu (torch.Tensor): output of encoder
+            mu (torch.Tensor): output of speech token encoder
                 shape: (batch_size, n_feats, mel_timesteps)
             mask (torch.Tensor): output_mask
                 shape: (batch_size, 1, mel_timesteps)
@@ -116,7 +116,7 @@ class ConditionalCFM(BASECFM):
             ) # dphi/dt NOTE dphi_dt.shape=[2, 80, 796]
             dphi_dt, cfg_dphi_dt = torch.split(dphi_dt, [x.size(0), x.size(0)], dim=0) # [1, 80, 796] and [1, 80, 796]
             dphi_dt = ((1.0 + self.inference_cfg_rate) * dphi_dt - self.inference_cfg_rate * cfg_dphi_dt) # Equation (14) in cosyvoice-1 paper: 2407.05407v2; beta=self.inference_cfg_rate=0.7 NOTE -> [1, 80, 796]
-            x = x + dt * dphi_dt # [1, 80, 796] + 0.0123 * [1, 80, 796] -> [1, 80, 796]
+            x = x + dt * dphi_dt # [1, 80, 796] + 0.0123 * [1, 80, 796] -> [1, 80, 796] NOTE 新得到的x，参与到下一轮循环中去
             t = t + dt # 0 + 0.0123 -> 0.0123
             sol.append(x)
             if step < len(t_span) - 1:

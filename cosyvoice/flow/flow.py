@@ -40,6 +40,7 @@ class MaskedDiffWithXvec(torch.nn.Module):
                                                           'n_blocks': 4, 'num_mid_blocks': 12, 'num_heads': 8, 'act_fn': 'gelu'}},
                  mel_feat_conf: Dict = {'n_fft': 1024, 'num_mels': 80, 'sampling_rate': 22050,
                                         'hop_size': 256, 'win_size': 1024, 'fmin': 0, 'fmax': 8000}):
+        import ipdb; ipdb.set_trace()
         super().__init__()
         self.input_size = input_size
         self.output_size = output_size
@@ -51,9 +52,9 @@ class MaskedDiffWithXvec(torch.nn.Module):
         logging.info(f"input frame rate={self.input_frame_rate}")
         self.input_embedding = nn.Embedding(vocab_size, input_size)
         self.spk_embed_affine_layer = torch.nn.Linear(spk_embed_dim, output_size)
-        self.encoder = encoder
+        self.encoder = encoder # TODO
         self.encoder_proj = torch.nn.Linear(self.encoder.output_size(), output_size)
-        self.decoder = decoder
+        self.decoder = decoder # TODO
         self.length_regulator = length_regulator
         self.only_mask_loss = only_mask_loss
 
@@ -88,7 +89,7 @@ class MaskedDiffWithXvec(torch.nn.Module):
             if random.random() < 0.5: # NOTE TODO why 0.5?
                 continue
             index = random.randint(0, int(0.3 * j)) # NOTE 
-            conds[i, :index] = feat[i, :index] # 前面30%的来自音频的梅尔谱，给conds
+            conds[i, :index] = feat[i, :index] # 前面(最多)30%的来自音频的梅尔谱，给conds, 这也符合论文中说的"a masked version of X_1 by setting continuous frames to zeros from a random start point to the end!" 即: conds[i, index:]的内容都是0了, 合理
         conds = conds.transpose(1, 2) # [20, 95, 80] -> [20, 80, 95]
 
         mask = (~make_pad_mask(feat_len)).to(h) # mask.shape=[20, 95] 这个就是纯mask feat的
@@ -113,6 +114,7 @@ class MaskedDiffWithXvec(torch.nn.Module):
                   prompt_feat_len,
                   embedding,
                   flow_cache):
+        import ipdb; ipdb.set_trace()
         assert token.shape[0] == 1
         # xvec projection
         embedding = F.normalize(embedding, dim=1)
@@ -136,7 +138,7 @@ class MaskedDiffWithXvec(torch.nn.Module):
         conds = conds.transpose(1, 2)
 
         mask = (~make_pad_mask(torch.tensor([mel_len1 + mel_len2]))).to(h)
-        feat, flow_cache = self.decoder(
+        feat, flow_cache = self.decoder( # NOTE
             mu=h.transpose(1, 2).contiguous(),
             mask=mask.unsqueeze(1),
             spks=embedding,
@@ -180,11 +182,11 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
         self.output_type = output_type # 'mel'
         self.input_frame_rate = input_frame_rate # 25
         logging.info(f"input frame rate={self.input_frame_rate}")
-        self.input_embedding = nn.Embedding(vocab_size, input_size) # (6561, 512)
-        self.spk_embed_affine_layer = torch.nn.Linear(spk_embed_dim, output_size) # Linear(in_features=192, out_features=80, bias=True)
-        self.encoder = encoder # <class 'cosyvoice.transformer.upsample_encoder.UpsampleConformerEncoder'> NOTE
-        self.encoder_proj = torch.nn.Linear(self.encoder.output_size(), output_size) # (512, 80)
-        self.decoder = decoder # <class 'cosyvoice.flow.flow_matching.CausalConditionalCFM'>
+        self.input_embedding = nn.Embedding(vocab_size, input_size) # (6561, 512) NOTE (1)
+        self.spk_embed_affine_layer = torch.nn.Linear(spk_embed_dim, output_size) # Linear(in_features=192, out_features=80, bias=True) NOTE (2)
+        self.encoder = encoder # <class 'cosyvoice.transformer.upsample_encoder.UpsampleConformerEncoder'> NOTE (3)
+        self.encoder_proj = torch.nn.Linear(self.encoder.output_size(), output_size) # (512, 80) NOTE (4)
+        self.decoder = decoder # <class 'cosyvoice.flow.flow_matching.CausalConditionalCFM'> NOTE (5) and (5) in total
         self.only_mask_loss = only_mask_loss # True
         self.token_mel_ratio = token_mel_ratio # 2 TODO for what?
         self.pre_lookahead_len = pre_lookahead_len # 3 TODO for what?
@@ -227,7 +229,7 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
 
         mask = (~make_pad_mask(h_lengths.sum(dim=-1).squeeze(dim=1))).to(h)
         import ipdb; ipdb.set_trace()
-        loss, _ = self.decoder.compute_loss(
+        loss, _ = self.decoder.compute_loss( # NOTE
             feat.transpose(1, 2).contiguous(),
             mask.unsqueeze(1),
             h.transpose(1, 2).contiguous(),
@@ -285,3 +287,4 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
         feat = feat[:, :, mel_len1:] # [1, 80, 622] ? NOTE 难道说，这是622个位置的梅尔谱，一次成型了？？？ 只需要十次loop (t=0 to 1 with [0, ..., 1] totally 11 timepoints) -> 是的，是一次成型了!
         assert feat.shape[2] == mel_len2
         return feat.float(), None # [1, 80, 622]
+

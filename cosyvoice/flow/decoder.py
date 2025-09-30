@@ -102,6 +102,7 @@ class ConditionalDecoder(nn.Module):
         This decoder requires an input with the same shape of the target. So, if your text content
         is shorter or longer than the outputs, please re-sampling it before feeding to the decoder.
         """
+        import ipdb; ipdb.set_trace()
         super().__init__()
         channels = tuple(channels)
         self.in_channels = in_channels
@@ -225,6 +226,7 @@ class ConditionalDecoder(nn.Module):
             _type_: _description_
         """
 
+        import ipdb; ipdb.set_trace()
         t = self.time_embeddings(t).to(t.dtype)
         t = self.time_mlp(t)
 
@@ -315,18 +317,18 @@ class CausalConditionalDecoder(ConditionalDecoder):
         channels = tuple(channels)
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.time_embeddings = SinusoidalPosEmb(in_channels)
+        self.time_embeddings = SinusoidalPosEmb(in_channels) # NOTE (1)
         time_embed_dim = channels[0] * 4
         self.time_mlp = TimestepEmbedding(
             in_channels=in_channels,
             time_embed_dim=time_embed_dim,
             act_fn="silu",
-        )
+        ) # inference, 320 -> linear_1 -> 1024 -> linear_2 -> 1024 NOTE (2)
         self.static_chunk_size = static_chunk_size
         self.num_decoding_left_chunks = num_decoding_left_chunks
-        self.down_blocks = nn.ModuleList([])
-        self.mid_blocks = nn.ModuleList([])
-        self.up_blocks = nn.ModuleList([])
+        self.down_blocks = nn.ModuleList([]) # NOTE (3)
+        self.mid_blocks = nn.ModuleList([]) # NOTE (4)
+        self.up_blocks = nn.ModuleList([]) # NOTE (5)
 
         output_channel = in_channels
         for i in range(len(channels)):  # pylint: disable=consider-using-enumerate
@@ -343,15 +345,15 @@ class CausalConditionalDecoder(ConditionalDecoder):
                         dropout=dropout,
                         activation_fn=act_fn,
                     )
-                    for _ in range(n_blocks)
+                    for _ in range(n_blocks) # 4
                 ]
-            )
+            ) # NOTE 这里面是四层 BasicTransformerBlock
             downsample = (
                 Downsample1D(output_channel) if not is_last else CausalConv1d(output_channel, output_channel, 3)
-            )
+            ) # CausalConv1d(256, 256, kernel_size=(3,), stride=(1,))
             self.down_blocks.append(nn.ModuleList([resnet, transformer_blocks, downsample]))
 
-        for _ in range(num_mid_blocks):
+        for _ in range(num_mid_blocks): # 12
             input_channel = channels[-1]
             out_channels = channels[-1]
             resnet = CausalResnetBlock1D(dim=input_channel, dim_out=output_channel, time_emb_dim=time_embed_dim)
@@ -365,13 +367,13 @@ class CausalConditionalDecoder(ConditionalDecoder):
                         dropout=dropout,
                         activation_fn=act_fn,
                     )
-                    for _ in range(n_blocks)
+                    for _ in range(n_blocks) # 4; 中间有12层，每一层是4个basic transformer block
                 ]
             )
 
             self.mid_blocks.append(nn.ModuleList([resnet, transformer_blocks]))
 
-        channels = channels[::-1] + (channels[0],)
+        channels = channels[::-1] + (channels[0],) # (256, 256)
         for i in range(len(channels) - 1):
             input_channel = channels[i] * 2
             output_channel = channels[i + 1]
@@ -390,7 +392,7 @@ class CausalConditionalDecoder(ConditionalDecoder):
                         dropout=dropout,
                         activation_fn=act_fn,
                     )
-                    for _ in range(n_blocks)
+                    for _ in range(n_blocks) # 4
                 ]
             )
             upsample = (
@@ -399,8 +401,8 @@ class CausalConditionalDecoder(ConditionalDecoder):
                 else CausalConv1d(output_channel, output_channel, 3)
             )
             self.up_blocks.append(nn.ModuleList([resnet, transformer_blocks, upsample]))
-        self.final_block = CausalBlock1D(channels[-1], channels[-1])
-        self.final_proj = nn.Conv1d(channels[-1], self.out_channels, 1)
+        self.final_block = CausalBlock1D(channels[-1], channels[-1]) # NOTE (6)
+        self.final_proj = nn.Conv1d(channels[-1], self.out_channels, 1) # NOTE (7)
         self.initialize_weights()
 
     def forward(self, x, mask, mu, t, spks=None, cond=None, streaming=False):

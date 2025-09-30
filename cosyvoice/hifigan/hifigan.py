@@ -12,8 +12,8 @@ class HiFiGan(nn.Module):
                  tpr_loss_weight=1.0, tpr_loss_tau=0.04):
         import ipdb; ipdb.set_trace()
         super(HiFiGan, self).__init__()
-        self.generator = generator # <class 'cosyvoice.hifigan.generator.HiFTGenerator'>
-        self.discriminator = discriminator # <class 'cosyvoice.hifigan.discriminator.MultipleDiscriminator'>
+        self.generator = generator # <class 'cosyvoice.hifigan.generator.HiFTGenerator'> NOTE (1)
+        self.discriminator = discriminator # <class 'cosyvoice.hifigan.discriminator.MultipleDiscriminator'> NOTE (2)
         self.mel_spec_transform = mel_spec_transform # [functools.partial(<function mel_spectrogram at 0x7fd03302e710>, n_fft=1920, num_mels=80, sampling_rate=24000, hop_size=480, win_size=1920, fmin=0, fmax=None, center=False)]
         self.multi_mel_spectral_recon_loss_weight = multi_mel_spectral_recon_loss_weight # 45
         self.feat_match_loss_weight = feat_match_loss_weight # 2.0
