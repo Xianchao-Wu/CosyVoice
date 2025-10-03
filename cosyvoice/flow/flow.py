@@ -40,7 +40,7 @@ class MaskedDiffWithXvec(torch.nn.Module):
                                                           'n_blocks': 4, 'num_mid_blocks': 12, 'num_heads': 8, 'act_fn': 'gelu'}},
                  mel_feat_conf: Dict = {'n_fft': 1024, 'num_mels': 80, 'sampling_rate': 22050,
                                         'hop_size': 256, 'win_size': 1024, 'fmin': 0, 'fmax': 8000}):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         super().__init__()
         self.input_size = input_size
         self.output_size = output_size
@@ -63,7 +63,7 @@ class MaskedDiffWithXvec(torch.nn.Module):
             batch: dict,
             device: torch.device,
     ) -> Dict[str, Optional[torch.Tensor]]: # NOTE for model training
-        import ipdb; ipdb.set_trace() # NOTE forward of class MaskedDiffWithXvec
+        #import ipdb; ipdb.set_trace() # NOTE forward of class MaskedDiffWithXvec
         token = batch['speech_token'].to(device) # [20, 56], pad.id=0; 语音-> speech tokenizer -> speech_token
         token_len = batch['speech_token_len'].to(device) # [20]
         feat = batch['speech_feat'].to(device) # [20, 95, 80], pad.id=0; 语音 -> 梅尔谱 NOTE 这个就是我们真正的目标数据！flow matching预测出来的也是梅尔谱
@@ -94,7 +94,7 @@ class MaskedDiffWithXvec(torch.nn.Module):
 
         mask = (~make_pad_mask(feat_len)).to(h) # mask.shape=[20, 95] 这个就是纯mask feat的
         # NOTE this is unnecessary, feat/h already same shape
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         loss, _ = self.decoder.compute_loss(
             feat.transpose(1, 2).contiguous(), # [20, 80, 95], 完整的梅尔谱, target
             mask.unsqueeze(1), # [20, 1, 95] 1 for value and 0 for pad
@@ -114,7 +114,7 @@ class MaskedDiffWithXvec(torch.nn.Module):
                   prompt_feat_len,
                   embedding,
                   flow_cache):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         assert token.shape[0] == 1
         # xvec projection
         embedding = F.normalize(embedding, dim=1)
@@ -172,7 +172,7 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
                                                           'n_blocks': 4, 'num_mid_blocks': 12, 'num_heads': 8, 'act_fn': 'gelu'}},
                  mel_feat_conf: Dict = {'n_fft': 1024, 'num_mels': 80, 'sampling_rate': 22050,
                                         'hop_size': 256, 'win_size': 1024, 'fmin': 0, 'fmax': 8000}):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         super().__init__()
         self.input_size = input_size # 512
         self.output_size = output_size # 80
@@ -196,7 +196,7 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
             batch: dict,
             device: torch.device,
     ) -> Dict[str, Optional[torch.Tensor]]:
-        import ipdb; ipdb.set_trace() # NOTE forward of CausalMaskedDiffWithXvec
+        #import ipdb; ipdb.set_trace() # NOTE forward of CausalMaskedDiffWithXvec
         token = batch['speech_token'].to(device)
         token_len = batch['speech_token_len'].to(device)
         feat = batch['speech_feat'].to(device)
@@ -228,7 +228,7 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
         conds = conds.transpose(1, 2)
 
         mask = (~make_pad_mask(h_lengths.sum(dim=-1).squeeze(dim=1))).to(h)
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         loss, _ = self.decoder.compute_loss( # NOTE
             feat.transpose(1, 2).contiguous(),
             mask.unsqueeze(1),
@@ -250,7 +250,7 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
                   embedding, # speaker embedding, extracted from ref voice
                   streaming,
                   finalize):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         assert token.shape[0] == 1
         # xvec projection
         embedding = F.normalize(embedding, dim=1) # [1, 192] -> [1, 192]

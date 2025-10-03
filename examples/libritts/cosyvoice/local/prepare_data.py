@@ -9,7 +9,7 @@ logger = logging.getLogger()
 
 
 def main():
-    wavs = list(glob.glob('{}/*/*/*wav'.format(args.src_dir)))
+    wavs = list(glob.glob('{}/*/*/*wav'.format(args.src_dir))) # NOTE TODO better change to os.walk to automatically walk through all the .wav files in current dir
 
     utt2wav, utt2text, utt2spk, spk2utt = {}, {}, {}, {}
     for wav in tqdm(wavs):
@@ -57,15 +57,36 @@ if __name__ == "__main__":
 '''
 四个种类的dict:
 
-ipdb> utt2wav -> wav.scp
+ipdb> dict utt2wav -> file wav.scp
 {'5694_64038_000014_000000': '/workspace/asr/CosyVoice/data/tts/openslr/libritts/LibriTTS/dev-clean/5694/64038/5694_64038_000014_000000.wav'}
+->
+5694_64038_000014_000000 /workspace/asr/CosyVoice/data/tts/openslr/libritts/LibriTTS/dev-clean/5694/64038/5694_64038_000014_000000.wav
 
-ipdb> utt2text -> text
+
+
+
+ipdb> dict utt2text -> file text
 {'5694_64038_000014_000000': 'A MAN IN THE WELL'}
+->
+5694_64038_000014_000000 A MAN IN THE WELL
+
+
+
 
 ipdb> utt2spk -> utt2spk
 {'5694_64038_000014_000000': '5694'} # 5694=speaker.id
+->
+5694_64038_000014_000000 5694
+
+
+
 
 ipdb> spk2utt -> spk2utt
 {'5694': ['5694_64038_000014_000000']}
+->
+7976 7976_105575_000008_000000 7976_105575_000018_000010 7976_105575_000008_000007 7976_105575_000004_00...
+
+
+
+
 '''

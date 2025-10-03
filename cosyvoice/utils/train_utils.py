@@ -144,7 +144,7 @@ def init_optimizer_and_scheduler(args, configs, model, gan):
 
     else:
         # currently we wrap generator and discriminator in one model, so we cannot use deepspeed
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         if configs['train_conf']['optim'] == 'adam':
             ###optimizer = optim.Adam(model.module.generator.parameters(), **configs['train_conf']['optim_conf']) # TODO
             optimizer = optim.Adam(model.generator.parameters(), **configs['train_conf']['optim_conf'])
@@ -196,7 +196,7 @@ def init_summarywriter(args):
 
 
 def save_model(model, model_name, info_dict):
-    import ipdb; ipdb.set_trace()
+    #import ipdb; ipdb.set_trace()
     rank = int(os.environ.get('RANK', 0))
     model_dir = info_dict["model_dir"]
     save_model_path = os.path.join(model_dir, '{}.pt'.format(model_name))
@@ -242,7 +242,7 @@ def cosyvoice_join(group_join, info_dict):
 
 def batch_forward(model, batch, scaler, info_dict, ref_model=None, dpo_loss=None):
     device = int(os.environ.get('LOCAL_RANK', 0))
-    import ipdb; ipdb.set_trace()
+    #import ipdb; ipdb.set_trace()
     dtype = info_dict["dtype"]
     if dtype == "fp16":
         dtype = torch.float16

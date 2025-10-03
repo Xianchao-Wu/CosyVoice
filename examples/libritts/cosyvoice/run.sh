@@ -10,6 +10,7 @@ data_url=www.openslr.org/resources/60
 data_dir="/workspace/asr/CosyVoice/data/tts/openslr/libritts"
 pretrained_model_dir=../../../pretrained_models/CosyVoice-300M
 
+# TODO 这里就是下载数据
 if [ ${stage} -le -1 ] && [ ${stop_stage} -ge -1 ]; then
   echo "Data Download"
   for part in dev-clean test-clean dev-other test-other train-clean-100 train-clean-360 train-other-500; do

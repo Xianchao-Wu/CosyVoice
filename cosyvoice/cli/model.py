@@ -101,7 +101,7 @@ class CosyVoiceModel:
         return {'min_shape': min_shape, 'opt_shape': opt_shape, 'max_shape': max_shape, 'input_names': input_names}
 
     def llm_job(self, text, prompt_text, llm_prompt_speech_token, llm_embedding, uuid):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         with self.llm_context, torch.cuda.amp.autocast(self.fp16 is True and hasattr(self.llm, 'vllm') is False):
             if isinstance(text, Generator):
                 assert isinstance(self, CosyVoice2Model) and not hasattr(self.llm, 'vllm'), 'streaming input text is only implemented for CosyVoice2 and do not support vllm!'
@@ -247,7 +247,7 @@ class CosyVoice2Model(CosyVoiceModel):
                  flow: torch.nn.Module, # <class 'cosyvoice.flow.flow.CausalMaskedDiffWithXvec'>
                  hift: torch.nn.Module, # <class 'cosyvoice.hifigan.generator.HiFTGenerator'>
                  fp16: bool = False):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.llm = llm # 24 Qwen2DecoderLayer, 505,803,812 (0.5B=505.8M)
         self.flow = flow # 112,549,360 (112M), flow.encoder with 6 ConformerEncoderLayer 37831168 of 33.6%; flow.decoder with 1 down block, 12 mid blocks and 1 up block and 1 final block 71302480 of 63.4%
@@ -287,7 +287,7 @@ class CosyVoice2Model(CosyVoiceModel):
         del self.llm.llm.model.model.layers
 
     def token2wav(self, token, prompt_token, prompt_feat, embedding, token_offset, uuid, stream=False, finalize=False, speed=1.0):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         with torch.cuda.amp.autocast(self.fp16):
             tts_mel, _ = self.flow.inference(token=token.to(self.device),
                                              token_len=torch.tensor([token.shape[1]], dtype=torch.int32).to(self.device),
@@ -328,7 +328,7 @@ class CosyVoice2Model(CosyVoiceModel):
             llm_prompt_speech_token=torch.zeros(1, 0, dtype=torch.int32),
             flow_prompt_speech_token=torch.zeros(1, 0, dtype=torch.int32),
             prompt_speech_feat=torch.zeros(1, 0, 80), source_speech_token=torch.zeros(1, 0, dtype=torch.int32), stream=False, speed=1.0, **kwargs):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         # this_uuid is used to track variables related to this inference thread
         this_uuid = str(uuid.uuid1()) # 'ac791c6e-8956-11f0-abc2-0242ac110005'
         with self.lock:
@@ -375,7 +375,7 @@ class CosyVoice2Model(CosyVoiceModel):
         else:
             # deal with all tokens NOTE flow matching, from speech tokens to mel-spectrogram
             ###p.join()
-            import ipdb; ipdb.set_trace()
+            #import ipdb; ipdb.set_trace()
             this_tts_speech_token = torch.tensor(self.tts_speech_token_dict[this_uuid]).unsqueeze(dim=0) # 311 speech tokens -> torch.Size([1, 311])
             this_tts_speech = self.token2wav(token=this_tts_speech_token, # [1, 311]
                                              prompt_token=flow_prompt_speech_token, # [1, 87]

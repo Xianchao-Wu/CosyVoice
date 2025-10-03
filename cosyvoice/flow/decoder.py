@@ -102,7 +102,7 @@ class ConditionalDecoder(nn.Module):
         This decoder requires an input with the same shape of the target. So, if your text content
         is shorter or longer than the outputs, please re-sampling it before feeding to the decoder.
         """
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         super().__init__()
         channels = tuple(channels)
         self.in_channels = in_channels
@@ -226,7 +226,7 @@ class ConditionalDecoder(nn.Module):
             _type_: _description_
         """
 
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         t = self.time_embeddings(t).to(t.dtype)
         t = self.time_mlp(t)
 
@@ -312,7 +312,7 @@ class CausalConditionalDecoder(ConditionalDecoder):
         This decoder requires an input with the same shape of the target. So, if your text content
         is shorter or longer than the outputs, please re-sampling it before feeding to the decoder.
         """
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         torch.nn.Module.__init__(self)
         channels = tuple(channels)
         self.in_channels = in_channels
@@ -423,7 +423,7 @@ class CausalConditionalDecoder(ConditionalDecoder):
         Returns:
             _type_: _description_
         """
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         t = self.time_embeddings(t).to(t.dtype) # SinusoidalPosEmb(), [2] -> [2, 320]
         t = self.time_mlp(t) # linear(320, 1024) -> SiLU() -> linear(1024, 1024); for t [2, 320] -> [2, 1024]
 

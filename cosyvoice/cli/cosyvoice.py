@@ -48,7 +48,7 @@ class CosyVoice:
         if torch.cuda.is_available() is False and (load_jit is True or load_trt is True or fp16 is True):
             load_jit, load_trt, fp16 = False, False, False
             logging.warning('no cuda device, set load_jit/load_trt/fp16 to False')
-        import ipdb; ipdb.set_trace() # NOTE
+        #import ipdb; ipdb.set_trace() # NOTE
         self.model = CosyVoiceModel(configs['llm'], configs['flow'], configs['hift'], fp16)
         self.model.load('{}/llm.pt'.format(model_dir),
                         '{}/flow.pt'.format(model_dir),
@@ -69,7 +69,7 @@ class CosyVoice:
         return spks
 
     def add_zero_shot_spk(self, prompt_text, prompt_speech_16k, zero_shot_spk_id):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         assert zero_shot_spk_id != '', 'do not use empty zero_shot_spk_id'
         model_input = self.frontend.frontend_zero_shot('', prompt_text, prompt_speech_16k, self.sample_rate, '')
         del model_input['text']
@@ -92,7 +92,7 @@ class CosyVoice:
                 start_time = time.time()
 
     def inference_zero_shot(self, tts_text, prompt_text, prompt_speech_16k, zero_shot_spk_id='', stream=False, speed=1.0, text_frontend=True): # TODO text_frontend -> is_text_frontend
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         prompt_text = self.frontend.text_normalize(prompt_text, split=False, text_frontend=text_frontend)
         for i in tqdm(self.frontend.text_normalize(tts_text, split=True, text_frontend=text_frontend)):
             if (not isinstance(i, Generator)) and len(i) < 0.5 * len(prompt_text):
@@ -107,7 +107,7 @@ class CosyVoice:
                 start_time = time.time()
 
     def inference_cross_lingual(self, tts_text, prompt_speech_16k, zero_shot_spk_id='', stream=False, speed=1.0, text_frontend=True):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         for i in tqdm(self.frontend.text_normalize(tts_text, split=True, text_frontend=text_frontend)):
             model_input = self.frontend.frontend_cross_lingual(i, prompt_speech_16k, self.sample_rate, zero_shot_spk_id)
             start_time = time.time()
@@ -146,7 +146,7 @@ class CosyVoice:
 class CosyVoice2(CosyVoice):
 
     def __init__(self, model_dir, load_jit=False, load_trt=False, load_vllm=False, fp16=False, trt_concurrent=1):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         self.instruct = True if '-Instruct' in model_dir else False # 'pretrained_models/CosyVoice2-0.5B' = model_dir
         self.model_dir = model_dir
         self.fp16 = fp16 # False
@@ -169,13 +169,13 @@ class CosyVoice2(CosyVoice):
             load_jit, load_trt, fp16 = False, False, False
             logging.warning('no cuda device, set load_jit/load_trt/fp16 to False')
 
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         self.model = CosyVoice2Model(configs['llm'], configs['flow'], configs['hift'], fp16) # NOTE
         self.model.load('{}/llm.pt'.format(model_dir),
                         '{}/flow.pt'.format(model_dir),
                         '{}/hift.pt'.format(model_dir))
 
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         if load_vllm: # False
             self.model.load_vllm('{}/vllm'.format(model_dir))
         if load_jit: # False
@@ -191,7 +191,7 @@ class CosyVoice2(CosyVoice):
         raise NotImplementedError('inference_instruct is not implemented for CosyVoice2!')
 
     def inference_instruct2(self, tts_text, instruct_text, prompt_speech_16k, zero_shot_spk_id='', stream=False, speed=1.0, text_frontend=True):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         assert isinstance(self.model, CosyVoice2Model), 'inference_instruct2 is only implemented for CosyVoice2!'
         for i in tqdm(self.frontend.text_normalize(tts_text, split=True, text_frontend=text_frontend)):
             model_input = self.frontend.frontend_instruct2(i, instruct_text, prompt_speech_16k, self.sample_rate, zero_shot_spk_id)

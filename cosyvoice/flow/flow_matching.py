@@ -20,7 +20,7 @@ from cosyvoice.utils.common import set_all_random_seed
 
 class ConditionalCFM(BASECFM):
     def __init__(self, in_channels, cfm_params, n_spks=1, spk_emb_dim=64, estimator: torch.nn.Module = None):
-        import ipdb; ipdb.set_trace()
+        ##import ipdb; ipdb.set_trace()
         super().__init__(
             n_feats=in_channels, # 240
             cfm_params=cfm_params, # {'sigma_min': 1e-06, 'solver': 'euler', 't_scheduler': 'cosine', 'training_cfg_rate': 0.2, 'inference_cfg_rate': 0.7, 'reg_loss_type': 'l1'}
@@ -53,7 +53,7 @@ class ConditionalCFM(BASECFM):
             sample: generated mel-spectrogram
                 shape: (batch_size, n_feats, mel_timesteps)
         """
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         z = torch.randn_like(mu).to(mu.device).to(mu.dtype) * temperature
         cache_size = cache.shape[2]
         # fix prompt and overlap part mu and z
@@ -84,7 +84,7 @@ class ConditionalCFM(BASECFM):
                 shape: (batch_size, spk_emb_dim)
             cond: Not used but kept for future purposes
         """
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         t, _, dt = t_span[0], t_span[-1], t_span[1] - t_span[0]
         t = t.unsqueeze(dim=0)
 
@@ -171,7 +171,7 @@ class ConditionalCFM(BASECFM):
             y: conditional flow
                 shape: (batch_size, n_feats, mel_timesteps)
         """
-        import ipdb; ipdb.set_trace() # NOTE for training also for inferencing??? TODO
+        #import ipdb; ipdb.set_trace() # NOTE for training also for inferencing??? TODO
         b, _, t = mu.shape
 
         # random timestep
@@ -199,7 +199,7 @@ class ConditionalCFM(BASECFM):
 
 class CausalConditionalCFM(ConditionalCFM):
     def __init__(self, in_channels, cfm_params, n_spks=1, spk_emb_dim=64, estimator: torch.nn.Module = None):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         super().__init__(in_channels, cfm_params, n_spks, spk_emb_dim, estimator)
         # in_channels: 240
         # cfm_params: {'sigma_min': 1e-06, 'solver': 'euler', 't_scheduler': 'cosine', 'training_cfg_rate': 0.2, 'inference_cfg_rate': 0.7, 'reg_loss_type': 'l1'}
@@ -228,7 +228,7 @@ class CausalConditionalCFM(ConditionalCFM):
             sample: generated mel-spectrogram
                 shape: (batch_size, n_feats, mel_timesteps)
         """
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         z = self.rand_noise[:, :, :mu.size(2)].to(mu.device).to(mu.dtype) * temperature # [1, 80, 15000] -> cut -> [1, 80, 796], temperature=1.0
         # fix prompt and overlap part mu and z
         t_span = torch.linspace(0, 1, n_timesteps + 1, device=mu.device, dtype=mu.dtype) # [0.0, 0.1, ..., 1.0] 一共11个元素, 0.0 to 1.0 之间的11个点; torch.Size([11])=t_span.shape

@@ -163,7 +163,7 @@ class UpsampleConformerEncoder(torch.nn.Module):
             gradient_checkpointing: rerunning a forward-pass segment for each
                 checkpointed segment during backward.
         """
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         super().__init__()
         self._output_size = output_size # 512
 
@@ -273,7 +273,7 @@ class UpsampleConformerEncoder(torch.nn.Module):
             checkpointing API because `__call__` attaches all the hooks of the module.
             https://discuss.pytorch.org/t/any-different-between-model-input-and-model-forward-input/3690/2
         """
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         T = xs.size(1)
         masks = ~make_pad_mask(xs_lens, T).unsqueeze(1)  # (B, 1, T)
         if self.global_cmvn is not None:

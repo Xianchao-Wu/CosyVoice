@@ -42,7 +42,7 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
   #for x in dev-clean; do
   for x in train-clean-100 train-clean-360 train-other-500 dev-other test-clean test-other; do
     python tools/extract_speech_token.py --dir data/$x \
-      --onnx_path $pretrained_model_dir/speech_tokenizer_v1.onnx
+      --onnx_path $pretrained_model_dir/speech_tokenizer_v1.onnx # NOTE TODO how to prepare this model?
   done
 fi
 

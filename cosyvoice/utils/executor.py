@@ -71,7 +71,7 @@ class Executor:
                 else:
                     context = nullcontext
 
-                import ipdb; ipdb.set_trace()
+                #import ipdb; ipdb.set_trace()
                 with context():
                     info_dict = batch_forward(model, batch_dict, scaler, info_dict, ref_model=self.ref_model, dpo_loss=self.dpo_loss) # NOTE
                     info_dict = batch_backward(model, scaler, info_dict)
@@ -94,7 +94,7 @@ class Executor:
         #writer, info_dict, scaler, group_join): # model=<class 'cosyvoice.hifigan.hifigan.HiFiGan'>; 
         ''' Train one epoch
         '''
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         lr = optimizer.param_groups[0]['lr']
         logging.info('Epoch {} TRAIN info lr {} rank {}'.format(self.epoch, lr, self.rank))
         logging.info('using accumulate grad, new batch size is {} times'
@@ -107,7 +107,7 @@ class Executor:
         model_context = nullcontext #model.join if info_dict['train_engine'] == 'torch_ddp' else nullcontext
         with model_context():
             for batch_idx, batch_dict in enumerate(train_data_loader):
-                import ipdb; ipdb.set_trace()
+                #import ipdb; ipdb.set_trace()
                 info_dict["tag"] = "TRAIN"
                 info_dict["step"] = self.step
                 info_dict["epoch"] = self.epoch
@@ -127,7 +127,7 @@ class Executor:
 
                 with context():
                     batch_dict['turn'] = 'discriminator'
-                    import ipdb; ipdb.set_trace()
+                    #import ipdb; ipdb.set_trace()
                     info_dict = batch_forward(model, batch_dict, scaler, info_dict)
                     info_dict = batch_backward(model, scaler, info_dict)
                 info_dict = update_parameter_and_lr(model, optimizer_d, scheduler_d, scaler, info_dict)
@@ -135,7 +135,7 @@ class Executor:
                 log_per_step(writer, info_dict)
                 with context():
                     batch_dict['turn'] = 'generator'
-                    import ipdb; ipdb.set_trace()
+                    #import ipdb; ipdb.set_trace()
                     info_dict = batch_forward(model, batch_dict, scaler, info_dict)
                     info_dict = batch_backward(model, scaler, info_dict)
                 info_dict = update_parameter_and_lr(model, optimizer, scheduler, scaler, info_dict)

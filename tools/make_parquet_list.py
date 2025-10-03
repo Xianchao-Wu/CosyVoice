@@ -42,7 +42,7 @@ def job(utt_list, parquet_file, utt2parquet_file, spk2parquet_file):
     df = pd.DataFrame()
     df['utt'] = utt_list # case id list
     df['wav'] = wav_list # wav file name list
-    df['audio_data'] = data_list # 真实的audio数据
+    df['audio_data'] = data_list # 真实的audio数据, 这是保持原始的采样率24000不变
     df['text'] = text_list # all text list
     df['spk'] = spk_list # speaker id list for each case
     df['utt_embedding'] = uttembedding_list # speaker embedding vector list

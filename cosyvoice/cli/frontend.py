@@ -45,7 +45,7 @@ class CosyVoiceFrontEnd:
                  speech_tokenizer_model: str,
                  spk2info: str = '',
                  allowed_special: str = 'all'):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         self.tokenizer = get_tokenizer() # <cosyvoice.tokenizer.tokenizer.QwenTokenizer object at 0x7f4ef2eb32b0> 文本text tokenizer
         self.feat_extractor = feat_extractor # functools.partial(<function mel_spectrogram at 0x7f4e97d01990>, n_fft=1920, num_mels=80, sampling_rate=24000, hop_size=480, win_size=1920, fmin=0, fmax=8000, center=False) # 抽取一个语音的梅尔谱，例如[1, 83589] -> [1, 174, 80]
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -127,7 +127,7 @@ class CosyVoiceFrontEnd:
         # speech_feat.shape=[1, 174, 80], speech_feat_len=174
 
     def text_normalize(self, text, split=True, text_frontend=True):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         if isinstance(text, Generator):
             logging.info('get tts_text generator, will skip text_normalize!')
             return [text]

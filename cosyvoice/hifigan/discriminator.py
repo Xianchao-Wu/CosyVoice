@@ -21,7 +21,7 @@ class MultipleDiscriminator(nn.Module):
         self.mrd = mrd
 
     def forward(self, y: torch.Tensor, y_hat: torch.Tensor): # y.shape=[20, 24576]=y_hat.shape
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         y_d_rs, y_d_gs, fmap_rs, fmap_gs = [], [], [], []
         this_y_d_rs, this_y_d_gs, this_fmap_rs, this_fmap_gs = self.mpd(y.unsqueeze(dim=1), y_hat.unsqueeze(dim=1)) # mpd = MultiPeriodDiscriminator(, [20, 304/306/305/308/308]=this_y_d_rs,     [20, 304/306/305/308/308]=this_y_d_gs,      
         y_d_rs += this_y_d_rs

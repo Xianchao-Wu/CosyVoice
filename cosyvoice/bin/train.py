@@ -95,7 +95,7 @@ def get_args():
 
 @record
 def main():
-    import ipdb; ipdb.set_trace()
+    ##import ipdb; ipdb.set_trace()
     args = get_args()
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s %(levelname)s %(message)s')
@@ -116,11 +116,11 @@ def main():
     configs['train_conf'].update(vars(args))
 
     # Init env for ddp
-    import ipdb; ipdb.set_trace()
+    ##import ipdb; ipdb.set_trace()
     ###init_distributed(args) # TODO for debug only
 
     # Get dataset & dataloader
-    import ipdb; ipdb.set_trace()
+    ##import ipdb; ipdb.set_trace()
     train_dataset, cv_dataset, train_data_loader, cv_data_loader = \
         init_dataset_and_dataloader(args, configs, gan, args.dpo)
 
@@ -133,7 +133,7 @@ def main():
     # load checkpoint
     if args.dpo is True:
         configs[args.model].forward = configs[args.model].forward_dpo
-    import ipdb; ipdb.set_trace()
+    ##import ipdb; ipdb.set_trace()
     model = configs[args.model] # <class 'cosyvoice.llm.llm.TransformerLM'>, 'llm', 310,718,465 parameters -> 300M case in '../../../pretrained_models/CosyVoice-300M/llm.pt' ||| <class 'cosyvoice.flow.flow.MaskedDiffWithXvec'>, 104M=104,874,752, '../../../pretrained_models/CosyVoice-300M/flow.pt'
     start_step, start_epoch = 0, -1
     if args.checkpoint is not None:
@@ -152,7 +152,7 @@ def main():
     model = model.cuda()
 
     # Get optimizer & scheduler
-    import ipdb; ipdb.set_trace()
+    ##import ipdb; ipdb.set_trace()
     model, optimizer, scheduler, optimizer_d, scheduler_d = init_optimizer_and_scheduler(args, configs, model, gan)
     scheduler.set_step(start_step)
     if scheduler_d is not None:
@@ -190,12 +190,12 @@ def main():
         ###dist.barrier() # TODO
         #group_join = dist.new_group(backend="gloo", timeout=datetime.timedelta(seconds=args.timeout))
         if gan is True:
-            import ipdb; ipdb.set_trace()
+            ##import ipdb; ipdb.set_trace()
             executor.train_one_epoc_gan(model, optimizer, scheduler, optimizer_d, scheduler_d, train_data_loader, cv_data_loader,
                                         writer, info_dict, scaler)
             ###writer, info_dict, scaler, group_join) # TODO
         else:
-            import ipdb; ipdb.set_trace()
+            ##import ipdb; ipdb.set_trace()
             ###executor.train_one_epoc(model, optimizer, scheduler, train_data_loader, cv_data_loader, writer, info_dict, scaler, group_join, ref_model=ref_model) # TODO
             executor.train_one_epoc(model, optimizer, scheduler, train_data_loader, cv_data_loader, writer, info_dict, scaler, ref_model=ref_model)
         dist.destroy_process_group(group_join)

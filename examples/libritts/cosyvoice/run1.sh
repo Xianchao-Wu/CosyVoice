@@ -17,7 +17,7 @@ if [ ${stage} -le -1 ] && [ ${stop_stage} -ge -1 ]; then
   done
 fi
 
-# TODO 准备数据，就是准备wav.scp, text, utt2spk, spk2utt这几个文本文件
+# 准备数据，就是准备wav.scp, text, utt2spk, spk2utt这几个文本文件
 if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
   echo "Data preparation, prepare wav.scp/text/utt2spk/spk2utt"
   #for x in train-clean-100 train-clean-360 train-other-500 dev-clean dev-other test-clean test-other; do

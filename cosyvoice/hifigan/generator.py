@@ -556,7 +556,7 @@ class HiFTGenerator(nn.Module):
             batch: dict,
             device: torch.device,
     ) -> Dict[str, Optional[torch.Tensor]]:
-        import ipdb; ipdb.set_trace() # for training NOTE
+        #import ipdb; ipdb.set_trace() # for training NOTE
         speech_feat = batch['speech_feat'].transpose(1, 2).to(device) # [20, 80, 96]
         # mel->f0 从梅尔谱到f0
         f0 = self.f0_predictor(speech_feat) # [20, 80, 96] -> ConvRNNF0Predictor -> [20, 96]

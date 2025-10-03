@@ -10,7 +10,7 @@ class HiFiGan(nn.Module):
     def __init__(self, generator, discriminator, mel_spec_transform,
                  multi_mel_spectral_recon_loss_weight=45, feat_match_loss_weight=2.0,
                  tpr_loss_weight=1.0, tpr_loss_tau=0.04):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         super(HiFiGan, self).__init__()
         self.generator = generator # <class 'cosyvoice.hifigan.generator.HiFTGenerator'> NOTE (1)
         self.discriminator = discriminator # <class 'cosyvoice.hifigan.discriminator.MultipleDiscriminator'> NOTE (2)
@@ -25,14 +25,14 @@ class HiFiGan(nn.Module):
             batch: dict,
             device: torch.device,
     ) -> Dict[str, Optional[torch.Tensor]]:
-        import ipdb; ipdb.set_trace() # for training hifigan NOTE
+        #import ipdb; ipdb.set_trace() # for training hifigan NOTE
         if batch['turn'] == 'generator':
             return self.forward_generator(batch, device)
         else:
             return self.forward_discriminator(batch, device)
 
     def forward_generator(self, batch, device):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         real_speech = batch['speech'].to(device) # torch.Size([20, 24576])
         pitch_feat = batch['pitch_feat'].to(device) # torch.Size([20, 96])
         # 1. calculate generator outputs
@@ -54,16 +54,16 @@ class HiFiGan(nn.Module):
         return {'loss': loss, 'loss_gen': loss_gen, 'loss_fm': loss_fm, 'loss_mel': loss_mel, 'loss_tpr': loss_tpr, 'loss_f0': loss_f0}
 
     def forward_discriminator(self, batch, device):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         real_speech = batch['speech'].to(device) # [20, 24576] 最原始的语音张量
         # 1. calculate generator outputs
         with torch.no_grad():
             generated_speech, generated_f0 = self.generator(batch, device) # [20, 24576] and [20, 96]
         # 2. calculate discriminator outputs
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         y_d_rs, y_d_gs, fmap_rs, fmap_gs = self.discriminator(real_speech, generated_speech.detach())
         # 3. calculate discriminator losses, tpr losses [Optional]
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         loss_disc, _, _ = discriminator_loss(y_d_rs, y_d_gs) # NOTE
         if self.tpr_loss_weight != 0:
             loss_tpr = tpr_loss(y_d_rs, y_d_gs, self.tpr_loss_tau) # NOTE
